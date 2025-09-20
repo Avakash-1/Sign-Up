@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Sign Up</title>
     <link rel="stylesheet" href="styles/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="avatar-bar">
@@ -12,7 +13,7 @@
         <button id="changeAvatarBtn" class="avatar-btn">Change Avatar</button>
     </div>
     <div class="signup-container">
-        <button id="darkModeBtn" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
+        <button id="darkModeBtn" class="dark-mode-toggle">🌙</button>
         <h2>Sign Up</h2>
         <form id="signupForm">
             <input type="text" id="username" placeholder="Username" required>
@@ -26,7 +27,7 @@
         <a href="#" id="showLogin">Already have an account? Log in</a>
     </div>
     <div class="login-container" style="display:none;">
-        <button id="darkModeBtn2" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
+        <button id="darkModeBtn2" class="dark-mode-toggle">🌙</button>
         <h2>Log In</h2>
         <form id="loginForm">
             <input type="text" id="loginUsername" placeholder="Username" required>
@@ -40,26 +41,54 @@
         <a href="#" id="showSignup">Don't have an account? Sign up</a>
     </div>
     <div class="comments-container" style="display:none;">
-        <button id="darkModeBtn3" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
+        <button id="darkModeBtn3" class="dark-mode-toggle">🌙</button>
         <h2>Comments & Reviews</h2>
+        <p class="markdown-info">Supports **Markdown** formatting.</p>
         <form id="commentForm">
-            <textarea id="commentInput" placeholder="Write your comment or review..." required></textarea>
-            <button type="submit">Post</button>
+            <div class="textarea-wrapper">
+                <textarea id="commentInput" placeholder="Write your comment or review..."></textarea>
+                <button type="button" id="emojiBtn">😀</button>
+            </div>
+            <div class="form-actions">
+                <input type="file" id="commentFileInput" accept="image/*,video/*" style="display: none;">
+                <button type="button" id="attachFileBtn" class="secondary-btn">📎 Attach File</button>
+                <button type="submit">Post</button>
+            </div>
+            <span id="fileName" class="file-name-display"></span>
         </form>
+        <div class="comments-toolbar">
+            <label for="sortComments">Sort by:</label>
+            <select id="sortComments">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="most-liked">Most Liked</option>
+            </select>
+        </div>
         <div id="commentsList"></div>
         <button id="showFeedbackBtn" style="margin-top:2em;">Go to Feedback</button>
         <button id="logoutBtn" style="margin-top:1em;">Log Out</button>
     </div>
+    <div class="profile-container" style="display:none;">
+        <button id="darkModeBtn4" class="dark-mode-toggle">🌙</button>
+        <div id="profileHeader">
+            <img id="profileAvatar" src="" alt="User Avatar" class="avatar-img">
+            <h2 id="profileUsername"></h2>
+        </div>
+        <h3>User's Comments</h3>
+        <div id="profileCommentsList"></div>
+        <button id="backToCommentsBtn" style="margin-top:2em;">Back to All Comments</button>
+    </div>
     <div class="feedback-container" style="display:none;">
-        <button id="darkModeBtn4" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
+        <button id="darkModeBtn5" class="dark-mode-toggle">🌙</button>
         <h2>Feedback</h2>
         <form id="feedbackForm">
             <textarea id="feedbackInput" placeholder="Your feedback..." required></textarea>
             <button type="submit">Send Feedback</button>
         </form>
         <div id="feedbackList"></div>
-        <button id="backToCommentsBtn" style="margin-top:2em;">Back to Comments</button>
+        <button id="backToCommentsFromFeedbackBtn" style="margin-top:2em;">Back to Comments</button>
     </div>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
     <script src="Javascript/main.js"></script>
 </body>
 </html>
