@@ -6,7 +6,13 @@
     <link rel="stylesheet" href="styles/style.css">
 </head>
 <body>
+    <div class="avatar-bar">
+        <img id="avatarImg" src="https://ui-avatars.com/api/?name=Guest&background=6e45e2&color=fff&rounded=true" alt="Avatar" class="avatar-img">
+        <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+        <button id="changeAvatarBtn" class="avatar-btn">Change Avatar</button>
+    </div>
     <div class="signup-container">
+        <button id="darkModeBtn" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
         <h2>Sign Up</h2>
         <form id="signupForm">
             <input type="text" id="username" placeholder="Username" required>
@@ -20,6 +26,7 @@
         <a href="#" id="showLogin">Already have an account? Log in</a>
     </div>
     <div class="login-container" style="display:none;">
+        <button id="darkModeBtn2" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
         <h2>Log In</h2>
         <form id="loginForm">
             <input type="text" id="loginUsername" placeholder="Username" required>
@@ -33,13 +40,25 @@
         <a href="#" id="showSignup">Don't have an account? Sign up</a>
     </div>
     <div class="comments-container" style="display:none;">
+        <button id="darkModeBtn3" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
         <h2>Comments & Reviews</h2>
         <form id="commentForm">
             <textarea id="commentInput" placeholder="Write your comment or review..." required></textarea>
             <button type="submit">Post</button>
         </form>
         <div id="commentsList"></div>
-        <button id="logoutBtn" style="margin-top:2em;">Log Out</button>
+        <button id="showFeedbackBtn" style="margin-top:2em;">Go to Feedback</button>
+        <button id="logoutBtn" style="margin-top:1em;">Log Out</button>
+    </div>
+    <div class="feedback-container" style="display:none;">
+        <button id="darkModeBtn4" style="margin-bottom:1em;float:right;">🌙 Dark Mode</button>
+        <h2>Feedback</h2>
+        <form id="feedbackForm">
+            <textarea id="feedbackInput" placeholder="Your feedback..." required></textarea>
+            <button type="submit">Send Feedback</button>
+        </form>
+        <div id="feedbackList"></div>
+        <button id="backToCommentsBtn" style="margin-top:2em;">Back to Comments</button>
     </div>
     <script src="Javascript/main.js"></script>
 </body>

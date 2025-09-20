@@ -6,7 +6,39 @@ body {
     min-height: 100vh;
 }
 
-.signup-container, .login-container, .comments-container {
+.avatar-bar {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    z-index: 10;
+}
+.avatar-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid #6e45e2;
+    object-fit: cover;
+    background: #fff;
+}
+.avatar-btn {
+    background: #6e45e2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4em 1em;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+.avatar-btn:hover {
+    background: #b06ab3;
+}
+
+.signup-container, .login-container, .comments-container, .feedback-container {
     background: rgba(255,255,255,0.95);
     padding: 2em;
     border-radius: 16px;
@@ -14,10 +46,18 @@ body {
     max-width: 400px;
     margin: 5em auto;
     text-align: center;
-    transition: box-shadow 0.3s;
+    transition: box-shadow 0.3s, background 0.3s, color 0.3s;
 }
 
-.signup-container:hover, .login-container:hover, .comments-container:hover {
+body.dark-mode .signup-container,
+body.dark-mode .login-container,
+body.dark-mode .comments-container,
+body.dark-mode .feedback-container {
+    background: #23243a;
+    color: #fff;
+}
+
+.signup-container:hover, .login-container:hover, .comments-container:hover, .feedback-container:hover {
     box-shadow: 0 12px 32px rgba(110,69,226,0.25), 0 2px 8px rgba(176,106,179,0.15);
 }
 
@@ -86,7 +126,7 @@ a:hover {
     color: #b06ab3;
 }
 
-#commentsList {
+#commentsList, #feedbackList {
     margin-top: 1.5em;
     text-align: left;
 }
@@ -99,6 +139,20 @@ a:hover {
     margin-bottom: 1em;
     box-shadow: 0 2px 8px rgba(110,69,226,0.10);
     word-break: break-word;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.comment-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    object-fit: cover;
+    background: #fff;
+    margin-top: 2px;
 }
 
 .comment-user {
@@ -108,12 +162,14 @@ a:hover {
     display: block;
 }
 
-textarea {
-    min-height: 60px;
-    max-height: 200px;
+.comment-timestamp {
+    font-size: 0.8em;
+    color: #e0e0ff;
+    margin-top: 0.2em;
+    margin-bottom: 0.5em;
 }
-/* Add to d:\Sign up prototype by Avakash\styles\style.css */
-.edit-btn, .delete-btn {
+
+.edit-btn, .delete-btn, .like-btn, .dislike-btn, .reply-btn {
     background: #fff;
     color: #6e45e2;
     border: none;
@@ -124,7 +180,54 @@ textarea {
     margin-left: 0.2em;
     transition: background 0.2s, color 0.2s;
 }
-.edit-btn:hover, .delete-btn:hover {
+.edit-btn:hover, .delete-btn:hover, .like-btn:hover, .dislike-btn:hover, .reply-btn:hover {
     background: #b06ab3;
     color: #fff;
+}
+
+.replies {
+    margin-top: 0.5em;
+    margin-left: 1em;
+}
+
+.reply {
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 0.5em;
+    margin-bottom: 0.3em;
+    color: #fff;
+}
+
+.reply-user {
+    font-weight: bold;
+    color: #ffe4fa;
+    margin-right: 0.5em;
+}
+
+.reply-timestamp {
+    font-size: 0.75em;
+    color: #e0e0ff;
+    margin-left: 0.5em;
+}
+
+.feedback-item {
+    background: linear-gradient(to right, #2193b0 0%, #6dd5ed 100%);
+    color: #23243a;
+    border-radius: 10px;
+    padding: 1em;
+    margin-bottom: 1em;
+    box-shadow: 0 2px 8px rgba(110,69,226,0.10);
+    word-break: break-word;
+}
+.feedback-user {
+    font-weight: bold;
+    color: #6e45e2;
+    margin-bottom: 0.5em;
+    display: block;
+}
+.feedback-timestamp {
+    font-size: 0.8em;
+    color: #23243a;
+    margin-top: 0.2em;
+    margin-bottom: 0.5em;
 }
