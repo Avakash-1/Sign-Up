@@ -9,25 +9,30 @@ document.addEventListener('DOMContentLoaded', function() {
     initNavigation();
     initForms();
 
+    // --- LOGIN PERSISTENCE LOGIC ---
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (loggedInUser) {
+        // If a user is found, show the main app view
         setAvatar(loggedInUser);
         document.getElementById('messagesBtn').style.display = 'inline-block';
         document.getElementById('floatingChatTab').style.display = 'block';
         updateFloatingChatTab();
-        showCommentsSection(loggedInUser);
+        showCommentsSection(loggedInUser); // Directly go to comments section
     } else {
+        // If no user is logged in, show the sign-up page
         setAvatar(null);
         showContainer('.signup-container');
     }
+    // Make the body visible after the initial view is set
     document.body.style.visibility = 'visible';
 });
 
+
 // --- UI INITIALIZATION FUNCTIONS ---
 function initDarkMode() {
-    document.querySelectorAll('.dark-mode-toggle').forEach(btn => {
-        btn.onclick = () => document.body.classList.toggle('dark-mode');
-    });
+    document.querySelector('.dark-mode-toggle').onclick = () => {
+        document.body.classList.toggle('dark-mode');
+    };
 }
 
 function initNavigation() {
@@ -39,13 +44,14 @@ function initNavigation() {
     document.getElementById('messagesBtn').onclick = showMessagingSection;
     document.getElementById('backToCommentsFromMessagesBtn').onclick = () => showContainer('.comments-container');
 
+    // Floating chat tab toggle logic
     document.getElementById('chatTabHeader').onclick = (e) => {
         if (e.target.id === 'chatTabToggle') {
             const tab = document.getElementById('floatingChatTab');
             tab.classList.toggle('minimized');
             e.target.textContent = tab.classList.contains('minimized') ? '+' : '-';
         } else {
-             showMessagingSection();
+             showMessagingSection(); // Open full message window if header is clicked
         }
     };
 }
@@ -54,8 +60,10 @@ function initForms() {
     document.getElementById('signupForm').onsubmit = handleSignup;
     document.getElementById('loginForm').onsubmit = handleLogin;
     document.getElementById('feedbackForm').onsubmit = handleFeedback;
+
     document.getElementById('toggleSignupPassword').onclick = (e) => togglePassword(e, 'password');
     document.getElementById('toggleLoginPassword').onclick = (e) => togglePassword(e, 'loginPassword');
+
     document.getElementById('changeAvatarBtn').onclick = () => document.getElementById('avatarInput').click();
     document.getElementById('avatarInput').onchange = handleAvatarChange;
 }
