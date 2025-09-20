@@ -327,3 +327,43 @@ a:hover { color: #b06ab3; }
 .feedback-item { background: linear-gradient(to right, #2193b0 0%, #6dd5ed 100%); color: #23243a; border-radius: 10px; padding: 1em; margin-bottom: 1em; box-shadow: 0 2px 8px rgba(110,69,226,0.10); word-break: break-word; }
 .feedback-user { font-weight: bold; color: #6e45e2; margin-bottom: 0.5em; display: block; }
 .feedback-timestamp { font-size: 0.8em; color: #23243a; margin-top: 0.2em; margin-bottom: 0.5em; }
+
+/* --- NEW RESPONSIVE STYLES --- */
+@media (max-width: 768px) {
+    .signup-container, .login-container, .comments-container, .feedback-container, .profile-container, .messaging-container {
+        margin: 1em;
+        padding: 1.5em;
+        width: auto;
+    }
+
+    .avatar-bar {
+        position: static;
+        padding: 1em;
+        justify-content: center;
+    }
+
+    .chat-layout {
+        flex-direction: column;
+        height: 70vh;
+    }
+
+    .user-list-panel, .chat-window-panel {
+        width: 100%;
+        border-right: none;
+    }
+
+    .user-list-panel {
+        height: 30%;
+        border-bottom: 1.5px solid #6e45e2;
+    }
+
+    .chat-window-panel {
+        height: 70%;
+    }
+
+    .floating-chat-tab {
+        width: auto;
+        right: 10px;
+        left: 10px;
+    }
+}
