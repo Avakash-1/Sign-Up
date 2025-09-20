@@ -177,6 +177,7 @@ button {
     font-weight: bold;
     box-shadow: 0 2px 8px rgba(110,69,226,0.10);
     transition: all 0.3s;
+    position: relative;
 }
 button:hover {
     background: linear-gradient(to top, #b06ab3 0%, #6dd5ed 100%);
@@ -242,7 +243,15 @@ body.dark-mode .file-name-display { color: #aaa; }
 
 /* Comments List */
 #commentsList, #feedbackList, #profileCommentsList { margin-top: 1.5em; text-align: left; }
-.comments-toolbar { text-align: right; margin: 1em 0; }
+.comments-toolbar { 
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1em 0; 
+}
+.comments-toolbar #searchInput {
+    width: 60%;
+}
 .comments-toolbar label { font-size: 0.9em; }
 .comments-toolbar select {
     padding: 0.3em;
@@ -298,6 +307,7 @@ body.dark-mode .comments-toolbar option {
     display: inline-block;
     cursor: pointer;
     transition: color 0.2s;
+    text-decoration: none;
 }
 .comment-user:hover { text-decoration: underline; color: #fff; }
 .comment-text { color: #e0e0ff; }
@@ -470,6 +480,71 @@ body.dark-mode .reply-btn:hover {
 .feedback-item { background: linear-gradient(to right, #2193b0 0%, #6dd5ed 100%); color: #23243a; border-radius: 10px; padding: 1em; margin-bottom: 1em; box-shadow: 0 2px 8px rgba(110,69,226,0.10); word-break: break-word; }
 .feedback-user { font-weight: bold; color: #6e45e2; margin-bottom: 0.5em; display: block; }
 .feedback-timestamp { font-size: 0.8em; color: #23243a; margin-top: 0.2em; margin-bottom: 0.5em; }
+
+/* Smart Scroll Button */
+#scrollToggleBtn {
+    position: fixed;
+    bottom: 20px;
+    left: 30px;
+    z-index: 99;
+    border: none;
+    outline: none;
+    background-color: #6e45e2;
+    color: white;
+    cursor: pointer;
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-size: 18px;
+}
+#scrollToggleBtn:hover {
+    background-color: #5a37b4;
+}
+
+/* Delete Confirmation Modal */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1001; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.4); 
+    padding-top: 60px;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 400px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.modal-actions {
+    margin-top: 1em;
+}
+
+/* Loading Spinner */
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 4px solid #fff;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 
 /* --- NEW RESPONSIVE STYLES --- */
 @media (max-width: 768px) {

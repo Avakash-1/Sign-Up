@@ -8,22 +8,20 @@ document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
     initNavigation();
     initForms();
+    initScrollToggleButton();
 
     // --- LOGIN PERSISTENCE LOGIC ---
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (loggedInUser) {
-        // If a user is found, show the main app view
         setAvatar(loggedInUser);
         document.getElementById('messagesBtn').style.display = 'inline-block';
         document.getElementById('floatingChatTab').style.display = 'block';
         updateFloatingChatTab();
-        showCommentsSection(loggedInUser); // Directly go to comments section
+        showCommentsSection(loggedInUser);
     } else {
-        // If no user is logged in, show the sign-up page
         setAvatar(null);
         showContainer('.signup-container');
     }
-    // Make the body visible after the initial view is set
     document.body.style.visibility = 'visible';
 });
 
@@ -46,14 +44,13 @@ function initNavigation() {
     document.getElementById('messagesBtn').onclick = showMessagingSection;
     document.getElementById('backToCommentsFromMessagesBtn').onclick = () => showContainer('.comments-container');
 
-    // Floating chat tab toggle logic
     document.getElementById('chatTabHeader').onclick = (e) => {
         if (e.target.id === 'chatTabToggle') {
             const tab = document.getElementById('floatingChatTab');
             tab.classList.toggle('minimized');
             e.target.textContent = tab.classList.contains('minimized') ? '+' : '-';
         } else {
-             showMessagingSection(); // Open full message window if header is clicked
+             showMessagingSection();
         }
     };
 }
@@ -62,12 +59,41 @@ function initForms() {
     document.getElementById('signupForm').onsubmit = handleSignup;
     document.getElementById('loginForm').onsubmit = handleLogin;
     document.getElementById('feedbackForm').onsubmit = handleFeedback;
-
     document.getElementById('toggleSignupPassword').onclick = (e) => togglePassword(e, 'password');
     document.getElementById('toggleLoginPassword').onclick = (e) => togglePassword(e, 'loginPassword');
-
     document.getElementById('changeAvatarBtn').onclick = () => document.getElementById('avatarInput').click();
     document.getElementById('avatarInput').onchange = handleAvatarChange;
+}
+
+function initScrollToggleButton() {
+    const scrollBtn = document.getElementById('scrollToggleBtn');
+    if (!scrollBtn) return;
+
+    scrollBtn.dataset.state = 'down';
+
+    window.onscroll = () => {
+        if (window.scrollY < 50) {
+            if (scrollBtn.dataset.state !== 'down') {
+                scrollBtn.innerHTML = '▼';
+                scrollBtn.title = 'Go to Bottom';
+                scrollBtn.dataset.state = 'down';
+            }
+        } else {
+             if (scrollBtn.dataset.state !== 'up') {
+                scrollBtn.innerHTML = '▲';
+                scrollBtn.title = 'Go to Top';
+                scrollBtn.dataset.state = 'up';
+            }
+        }
+    };
+
+    scrollBtn.onclick = () => {
+        if (scrollBtn.dataset.state === 'down') {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 }
 
 // --- UTILITY FUNCTIONS ---
@@ -83,6 +109,16 @@ function togglePassword(e, inputId) {
     const pwd = document.getElementById(inputId);
     pwd.type = pwd.type === 'password' ? 'text' : 'password';
     e.target.textContent = pwd.type === 'password' ? 'Show' : 'Hide';
+}
+
+function setLoading(button, isLoading) {
+    if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner"></span>';
+    } else {
+        button.disabled = false;
+        button.innerHTML = button.dataset.originalText;
+    }
 }
 
 // --- AVATAR & AUTHENTICATION ---
@@ -181,11 +217,16 @@ function showCommentsSection(username) {
         emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
     };
 
+    const postCommentBtn = document.getElementById('postCommentBtn');
+    postCommentBtn.dataset.originalText = 'Post';
+
     document.getElementById('commentForm').onsubmit = function(e) {
         e.preventDefault();
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
         if (!commentText && !file) return;
+        
+        setLoading(postCommentBtn, true);
 
         const saveComment = (attachmentData = null) => {
             let comments = JSON.parse(localStorage.getItem('comments') || '[]');
@@ -204,6 +245,7 @@ function showCommentsSection(username) {
             fileNameDisplay.textContent = '';
             if (emojiPicker) emojiPicker.style.display = 'none';
             renderComments();
+            setLoading(postCommentBtn, false);
         };
 
         if (file) {
@@ -211,16 +253,22 @@ function showCommentsSection(username) {
             reader.onload = (evt) => saveComment({ data: evt.target.result, type: file.type });
             reader.readAsDataURL(file);
         } else {
-            saveComment();
+            setTimeout(() => saveComment(), 500); // Simulate network delay
         }
     };
 
     document.getElementById('sortComments').onchange = (e) => { currentSort = e.target.value; renderComments(); };
     document.getElementById('logoutBtn').onclick = handleLogout;
     
+    document.getElementById('searchInput').oninput = (e) => renderComments(null, 'commentsList', e.target.value);
+
     document.getElementById('commentsList').onclick = (e) => {
         const user = e.target.closest('.comment-user, .reply-user')?.dataset.user;
-        if (user) showUserProfile(user);
+        if (user) {
+            e.preventDefault();
+            showUserProfile(user);
+            return;
+        }
 
         const likeBtn = e.target.closest('.like-btn');
         if (likeBtn) handleLike(likeBtn.dataset.id);
@@ -239,13 +287,22 @@ function showCommentsSection(username) {
     };
 }
 
-function renderComments(commentList = null, containerId = 'commentsList') {
+function renderComments(commentList = null, containerId = 'commentsList', searchTerm = '') {
     const commentsContainer = document.getElementById(containerId);
-    let comments = commentList || JSON.parse(localStorage.getItem('comments') || '[]');
+    let allComments = commentList || JSON.parse(localStorage.getItem('comments') || '[]');
     const loggedInUser = localStorage.getItem('loggedInUser');
 
+    let filteredComments = allComments;
+    if (searchTerm) {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        filteredComments = allComments.filter(comment => 
+            comment.text.toLowerCase().includes(lowerCaseSearchTerm) ||
+            comment.user.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+    }
+
     if (!commentList) {
-        comments.sort((a, b) => {
+        filteredComments.sort((a, b) => {
             if (currentSort === 'newest') return new Date(b.timestamp) - new Date(a.timestamp);
             if (currentSort === 'oldest') return new Date(a.timestamp) - new Date(b.timestamp);
             if (currentSort === 'most-liked') {
@@ -257,8 +314,8 @@ function renderComments(commentList = null, containerId = 'commentsList') {
         });
     }
 
-    commentsContainer.innerHTML = comments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
-    comments.forEach((comment) => {
+    commentsContainer.innerHTML = filteredComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
+    filteredComments.forEach((comment) => {
         const likeCount = comment.likedBy ? comment.likedBy.length : 0;
         const isLikedByCurrentUser = comment.likedBy && comment.likedBy.includes(loggedInUser);
         const likeBtnClass = isLikedByCurrentUser ? 'like-btn liked' : 'like-btn';
@@ -293,7 +350,7 @@ function renderComments(commentList = null, containerId = 'commentsList') {
             <div style="display: flex; align-items: flex-start; flex: 1;">
                 <img src="${getAvatarForUser(comment.user)}" class="comment-avatar" alt="avatar">
                 <div class="comment-content">
-                    <span class="comment-user" data-user="${comment.user}">${comment.user}</span>
+                    <a href="#" class="comment-user" data-user="${comment.user}">${comment.user}</a>
                     <div class="comment-text" id="comment-text-${comment.id}">${marked.parse(comment.text || '')}</div>
                     ${attachmentHtml}
                     <div class="comment-actions">
@@ -404,11 +461,33 @@ function toggleReplyBox(commentId) {
 }
 
 function handleDelete(commentId) {
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    comments = comments.filter(c => c.id !== commentIdNum);
-    localStorage.setItem('comments', JSON.stringify(comments));
-    renderComments();
+    const modal = document.createElement('div');
+    modal.id = 'deleteConfirmationModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <p>Are you sure you want to delete this comment?</p>
+            <div class="modal-actions">
+                <button id="confirmDeleteBtn" class="delete-btn">Delete</button>
+                <button id="cancelDeleteBtn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+
+    document.getElementById('cancelDeleteBtn').onclick = () => {
+        modal.remove();
+    };
+
+    document.getElementById('confirmDeleteBtn').onclick = () => {
+        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+        const commentIdNum = parseInt(commentId, 10);
+        comments = comments.filter(c => c.id !== commentIdNum);
+        localStorage.setItem('comments', JSON.stringify(comments));
+        renderComments();
+        modal.remove();
+    };
 }
 
 function handleEdit(commentId) {
@@ -456,6 +535,7 @@ function handleSave(commentId) {
 function showUserProfile(username) {
     showContainer('.profile-container');
     const userComments = JSON.parse(localStorage.getItem('comments') || '[]').filter(c => c.user === username);
+    
     document.getElementById('profileAvatar').src = getAvatarForUser(username);
     document.getElementById('profileUsername').textContent = username;
     
@@ -594,17 +674,26 @@ function handleFeedback(e) {
     e.preventDefault();
     const feedbackText = document.getElementById('feedbackInput').value.trim();
     if (feedbackText) {
+        const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
+        sendFeedbackBtn.dataset.originalText = 'Send Feedback';
+        setLoading(sendFeedbackBtn, true);
+
         let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
         feedbacks.push({ user: localStorage.getItem('loggedInUser') || 'Anonymous', text: feedbackText, timestamp: new Date().toLocaleString() });
         localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
         document.getElementById('feedbackInput').value = '';
         
+        renderFeedback();
+
         const feedbackMessage = document.getElementById('feedbackMessage');
+        feedbackMessage.textContent = 'Thank you! Your feedback has been submitted.';
         feedbackMessage.style.display = 'block';
+
         setTimeout(() => {
             feedbackMessage.style.display = 'none';
             showContainer('.comments-container');
-        }, 2000); // Show message for 2 seconds then switch
+            setLoading(sendFeedbackBtn, false);
+        }, 2000); 
     }
 }
 
