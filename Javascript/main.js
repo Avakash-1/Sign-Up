@@ -1,14 +1,30 @@
 // --- GLOBAL STATE ---
 let currentSort = 'newest';
 let emojiPicker = null;
+let currentChatPartner = null;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
     initNavigation();
     initForms();
-    setAvatar(localStorage.getItem('loggedInUser'));
+
+    // --- LOGIN PERSISTENCE LOGIC ---
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    if (loggedInUser) {
+        // If a user is found, show the main app view
+        setAvatar(loggedInUser);
+        document.getElementById('messagesBtn').style.display = 'inline-block';
+        document.getElementById('floatingChatTab').style.display = 'block';
+        updateFloatingChatTab();
+        showCommentsSection(loggedInUser); // Directly go to comments section
+    } else {
+        // If no user is logged in, show the sign-up page
+        setAvatar(null);
+        showContainer('.signup-container');
+    }
 });
+
 
 // --- UI INITIALIZATION FUNCTIONS ---
 function initDarkMode() {
@@ -23,6 +39,19 @@ function initNavigation() {
     document.getElementById('showFeedbackBtn').onclick = showFeedbackSection;
     document.getElementById('backToCommentsBtn').onclick = () => showContainer('.comments-container');
     document.getElementById('backToCommentsFromFeedbackBtn').onclick = () => showContainer('.comments-container');
+    document.getElementById('messagesBtn').onclick = showMessagingSection;
+    document.getElementById('backToCommentsFromMessagesBtn').onclick = () => showContainer('.comments-container');
+
+    // Floating chat tab toggle logic
+    document.getElementById('chatTabHeader').onclick = (e) => {
+        if (e.target.id === 'chatTabToggle') {
+            const tab = document.getElementById('floatingChatTab');
+            tab.classList.toggle('minimized');
+            e.target.textContent = tab.classList.contains('minimized') ? '+' : '-';
+        } else {
+             showMessagingSection(); // Open full message window if header is clicked
+        }
+    };
 }
 
 function initForms() {
@@ -39,7 +68,7 @@ function initForms() {
 
 // --- UTILITY FUNCTIONS ---
 function showContainer(selector) {
-    ['.signup-container', '.login-container', '.comments-container', '.feedback-container', '.profile-container'].forEach(c => {
+    ['.signup-container', '.login-container', '.comments-container', '.feedback-container', '.profile-container', '.messaging-container'].forEach(c => {
         document.querySelector(c).style.display = 'none';
     });
     document.querySelector(selector).style.display = 'block';
@@ -56,7 +85,7 @@ function togglePassword(e, inputId) {
 function setAvatar(username) {
     const avatarImg = document.getElementById('avatarImg');
     const userAvatar = localStorage.getItem('avatar');
-    if (username && userAvatar) {
+    if (username && userAvatar && userAvatar.trim() !== '') {
         avatarImg.src = userAvatar;
     } else if (username) {
         avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=6e45e2&color=fff&rounded=true`;
@@ -80,10 +109,8 @@ function handleAvatarChange(e) {
 function getAvatarForUser(username) {
     if (username === localStorage.getItem('loggedInUser')) {
         let avatar = localStorage.getItem('avatar');
-        if (avatar) return avatar;
+        if (avatar && avatar.trim() !== '') return avatar;
     }
-    // For simplicity, we'll generate avatars for other users.
-    // In a real app, you'd fetch this from a server.
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=2193b0&color=fff&rounded=true`;
 }
 
@@ -106,6 +133,9 @@ function handleLogin(e) {
     if (user && username === user.username && password === user.password) {
         localStorage.setItem('loggedInUser', username);
         setAvatar(username);
+        document.getElementById('messagesBtn').style.display = 'inline-block';
+        document.getElementById('floatingChatTab').style.display = 'block';
+        updateFloatingChatTab();
         showCommentsSection(username);
     } else {
         document.getElementById('loginMessage').textContent = 'Invalid credentials.';
@@ -115,7 +145,9 @@ function handleLogin(e) {
 function handleLogout() {
     localStorage.removeItem('loggedInUser');
     localStorage.removeItem('avatar');
-    showContainer('.login-container');
+    document.getElementById('messagesBtn').style.display = 'none';
+    document.getElementById('floatingChatTab').style.display = 'none';
+    showContainer('.signup-container'); // Go back to sign-up on logout
     setAvatar(null);
 }
 
@@ -127,20 +159,14 @@ function showCommentsSection(username) {
     const fileInput = document.getElementById('commentFileInput');
     const fileNameDisplay = document.getElementById('fileName');
     document.getElementById('attachFileBtn').onclick = () => fileInput.click();
-    fileInput.onchange = () => {
-        fileNameDisplay.textContent = fileInput.files.length > 0 ? `Selected: ${fileInput.files[0].name}` : '';
-    };
+    fileInput.onchange = () => { fileNameDisplay.textContent = fileInput.files.length > 0 ? `Selected: ${fileInput.files[0].name}` : ''; };
 
-    // Emoji Picker Logic
     const emojiBtn = document.getElementById('emojiBtn');
     emojiBtn.onclick = () => {
         if (!emojiPicker) {
             emojiPicker = document.createElement('emoji-picker');
             document.querySelector('.textarea-wrapper').appendChild(emojiPicker);
-            emojiPicker.addEventListener('emoji-click', event => {
-                const commentInput = document.getElementById('commentInput');
-                commentInput.value += event.detail.emoji.unicode;
-            });
+            emojiPicker.addEventListener('emoji-click', event => { document.getElementById('commentInput').value += event.detail.emoji.unicode; });
         }
         emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
     };
@@ -149,25 +175,12 @@ function showCommentsSection(username) {
         e.preventDefault();
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
-
-        if (!commentText && !file) {
-            alert('Please write a comment or select a file.');
-            return;
-        }
+        if (!commentText && !file) return;
 
         const saveComment = (attachmentData = null) => {
             let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-            comments.push({
-                user: username,
-                text: commentText,
-                timestamp: new Date().toISOString(), // Use ISO string for accurate sorting
-                likes: 0,
-                dislikes: 0,
-                replies: [],
-                attachment: attachmentData
-            });
+            comments.push({ user: username, text: commentText, timestamp: new Date().toISOString(), likes: 0, dislikes: 0, replies: [], attachment: attachmentData });
             localStorage.setItem('comments', JSON.stringify(comments));
-
             document.getElementById('commentInput').value = '';
             fileInput.value = '';
             fileNameDisplay.textContent = '';
@@ -177,23 +190,15 @@ function showCommentsSection(username) {
 
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(evt) {
-                saveComment({ data: evt.target.result, type: file.type });
-            };
+            reader.onload = (evt) => saveComment({ data: evt.target.result, type: file.type });
             reader.readAsDataURL(file);
         } else {
             saveComment();
         }
     };
 
-    document.getElementById('sortComments').onchange = (e) => {
-        currentSort = e.target.value;
-        renderComments();
-    };
-    
+    document.getElementById('sortComments').onchange = (e) => { currentSort = e.target.value; renderComments(); };
     document.getElementById('logoutBtn').onclick = handleLogout;
-    
-    // Event delegation for clicking usernames
     document.getElementById('commentsList').onclick = (e) => {
         if (e.target.classList.contains('comment-user') || e.target.classList.contains('reply-user')) {
             const user = e.target.dataset.user;
@@ -207,8 +212,7 @@ function renderComments(commentList = null, containerId = 'commentsList') {
     let comments = commentList || JSON.parse(localStorage.getItem('comments') || '[]');
     const loggedInUser = localStorage.getItem('loggedInUser');
 
-    // Sorting Logic
-    if (!commentList) { // Only sort the main comment list
+    if (!commentList) {
         comments.sort((a, b) => {
             if (currentSort === 'newest') return new Date(b.timestamp) - new Date(a.timestamp);
             if (currentSort === 'oldest') return new Date(a.timestamp) - new Date(b.timestamp);
@@ -217,27 +221,15 @@ function renderComments(commentList = null, containerId = 'commentsList') {
         });
     }
 
-    commentsContainer.innerHTML = '';
-    if (comments.length === 0) {
-        commentsContainer.innerHTML = '<p style="color:#6e45e2;text-align:center;">No comments yet. Be the first!</p>';
-        return;
-    }
-
+    commentsContainer.innerHTML = comments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
     comments.forEach((comment, idx) => {
         const div = document.createElement('div');
         div.className = 'comment';
-        
         let attachmentHtml = '';
         if (comment.attachment) {
-            if (comment.attachment.type.startsWith('image/')) {
-                attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="User upload"></div>`;
-            } else if (comment.attachment.type.startsWith('video/')) {
-                attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
-            }
+            if (comment.attachment.type.startsWith('image/')) attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="User upload"></div>`;
+            else if (comment.attachment.type.startsWith('video/')) attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
         }
-
-        const formattedTimestamp = new Date(comment.timestamp).toLocaleString();
-        
         div.innerHTML = `
             <div style="display: flex; align-items: flex-start; flex: 1;">
                 <img src="${getAvatarForUser(comment.user)}" class="comment-avatar" alt="avatar">
@@ -245,18 +237,21 @@ function renderComments(commentList = null, containerId = 'commentsList') {
                     <span class="comment-user" data-user="${comment.user}">${comment.user}</span>
                     <div class="comment-text">${marked.parse(comment.text || '')}</div>
                     ${attachmentHtml}
-                    <div class="comment-timestamp">${formattedTimestamp}</div>
+                    <div class="comment-timestamp">${new Date(comment.timestamp).toLocaleString()}</div>
                 </div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.3em; align-items: flex-end;">
-                <button class="like-btn" data-idx="${idx}">👍 ${comment.likes || 0}</button>
-                <button class="dislike-btn" data-idx="${idx}">👎 ${comment.dislikes || 0}</button>
-                ${comment.user === loggedInUser ? `
-                    <button class="edit-btn" data-idx="${idx}">✏️</button>
-                    <button class="delete-btn" data-idx="${idx}">🗑️</button>
-                ` : ''}
+                ${comment.user === loggedInUser ? `<button class="delete-btn" data-idx="${idx}">🗑️</button>` : ''}
             </div>
         `;
+
+        // --- FIX: MAKE ALL LINKS OPEN IN A NEW TAB ---
+        const links = div.querySelectorAll('.comment-text a');
+        links.forEach(link => {
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+        });
+        
         commentsContainer.appendChild(div);
     });
 }
@@ -264,13 +259,134 @@ function renderComments(commentList = null, containerId = 'commentsList') {
 // --- USER PROFILE LOGIC ---
 function showUserProfile(username) {
     showContainer('.profile-container');
-    const allComments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const userComments = allComments.filter(c => c.user === username);
-
+    const userComments = JSON.parse(localStorage.getItem('comments') || '[]').filter(c => c.user === username);
     document.getElementById('profileAvatar').src = getAvatarForUser(username);
     document.getElementById('profileUsername').textContent = username;
     
+    const messageUserBtn = document.getElementById('messageUserBtn');
+    if (username === localStorage.getItem('loggedInUser')) {
+        messageUserBtn.style.display = 'none';
+    } else {
+        messageUserBtn.style.display = 'inline-block';
+        messageUserBtn.onclick = () => {
+            showMessagingSection();
+            openChatWith(username);
+        };
+    }
+    
     renderComments(userComments, 'profileCommentsList');
+}
+
+// --- MESSAGING LOGIC ---
+function showMessagingSection() {
+    showContainer('.messaging-container');
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    const comments = JSON.parse(localStorage.getItem('comments') || '[]');
+    const allUsers = [...new Set(comments.map(c => c.user))];
+    const userListPanel = document.getElementById('userList');
+    userListPanel.innerHTML = '';
+    
+    allUsers.forEach(user => {
+        if (user === loggedInUser) return;
+        const userDiv = document.createElement('div');
+        userDiv.className = 'user-list-item';
+        userDiv.textContent = user;
+        userDiv.onclick = () => openChatWith(user);
+        userListPanel.appendChild(userDiv);
+    });
+
+    document.getElementById('messageForm').onsubmit = (e) => {
+        e.preventDefault();
+        const messageInput = document.getElementById('messageInput');
+        const text = messageInput.value.trim();
+        if (text && currentChatPartner) {
+            sendMessage(loggedInUser, currentChatPartner, text);
+            messageInput.value = '';
+            renderMessages(loggedInUser, currentChatPartner);
+        }
+    };
+
+    document.getElementById('chatHeader').textContent = 'Select a user to start chatting';
+    document.getElementById('messageList').innerHTML = '';
+    document.getElementById('messageForm').style.display = 'none';
+}
+
+function openChatWith(username) {
+    currentChatPartner = username;
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    document.getElementById('chatHeader').textContent = `Chat with ${username}`;
+    document.querySelectorAll('.user-list-item').forEach(item => {
+        item.classList.toggle('active', item.textContent === username);
+    });
+    document.getElementById('messageForm').style.display = 'flex';
+    renderMessages(loggedInUser, username);
+}
+
+function sendMessage(from, to, text) {
+    let messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    messages.push({ from, to, text, timestamp: new Date().toISOString() });
+    localStorage.setItem('messages', JSON.stringify(messages));
+    updateFloatingChatTab();
+}
+
+function renderMessages(user1, user2) {
+    const messageList = document.getElementById('messageList');
+    const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
+    const conversation = allMessages.filter(m => 
+        (m.from === user1 && m.to === user2) || (m.from === user2 && m.to === user1)
+    );
+    conversation.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    messageList.innerHTML = '';
+    conversation.forEach(msg => {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message-item ${msg.from === user1 ? 'sent' : 'received'}`;
+        msgDiv.textContent = msg.text;
+        messageList.appendChild(msgDiv);
+    });
+    messageList.scrollTop = messageList.scrollHeight;
+}
+
+function updateFloatingChatTab() {
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    if (!loggedInUser) return;
+
+    const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
+    const chatTabBody = document.getElementById('chatTabBody');
+    
+    const conversations = {};
+    allMessages.forEach(msg => {
+        if (msg.from === loggedInUser || msg.to === loggedInUser) {
+            const partner = msg.from === loggedInUser ? msg.to : msg.from;
+            if (!conversations[partner] || new Date(msg.timestamp) > new Date(conversations[partner].timestamp)) {
+                conversations[partner] = msg;
+            }
+        }
+    });
+
+    const recentConversations = Object.values(conversations)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (recentConversations.length === 0) {
+        chatTabBody.innerHTML = `<div class="no-messages">Start Messaging other people!</div>`;
+        return;
+    }
+
+    chatTabBody.innerHTML = '';
+    recentConversations.forEach(msg => {
+        const partner = msg.from === loggedInUser ? msg.to : msg.from;
+        const div = document.createElement('div');
+        div.className = 'chat-preview-item';
+        div.innerHTML = `
+            <div class="chat-preview-user">${partner}</div>
+            <div class="chat-preview-text">${msg.text}</div>
+        `;
+        div.onclick = () => {
+            showMessagingSection();
+            openChatWith(partner);
+        };
+        chatTabBody.appendChild(div);
+    });
 }
 
 // --- FEEDBACK SECTION LOGIC ---
@@ -284,11 +400,7 @@ function handleFeedback(e) {
     const feedbackText = document.getElementById('feedbackInput').value.trim();
     if (feedbackText) {
         let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-        feedbacks.push({
-            user: localStorage.getItem('loggedInUser') || 'Anonymous',
-            text: feedbackText,
-            timestamp: new Date().toLocaleString()
-        });
+        feedbacks.push({ user: localStorage.getItem('loggedInUser') || 'Anonymous', text: feedbackText, timestamp: new Date().toLocaleString() });
         localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
         document.getElementById('feedbackInput').value = '';
         renderFeedback();
@@ -298,19 +410,11 @@ function handleFeedback(e) {
 function renderFeedback() {
     const feedbackList = document.getElementById('feedbackList');
     let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    feedbackList.innerHTML = '';
-    if (feedbacks.length === 0) {
-        feedbackList.innerHTML = '<p style="color:#2193b0;text-align:center;">No feedback yet.</p>';
-    } else {
-        feedbacks.slice().reverse().forEach(feedback => {
-            const div = document.createElement('div');
-            div.className = 'feedback-item';
-            div.innerHTML = `
-                <span class="feedback-user">${feedback.user}</span>
-                <span class="feedback-text">${feedback.text}</span>
-                <div class="feedback-timestamp">${feedback.timestamp || ''}</div>
-            `;
-            feedbackList.appendChild(div);
-        });
-    }
+    feedbackList.innerHTML = feedbacks.length === 0 ? '<p style="color:#2193b0;text-align:center;">No feedback yet.</p>' : '';
+    feedbacks.slice().reverse().forEach(feedback => {
+        const div = document.createElement('div');
+        div.className = 'feedback-item';
+        div.innerHTML = `<span class="feedback-user">${feedback.user}</span><span class="feedback-text">${feedback.text}</span><div class="feedback-timestamp">${feedback.timestamp || ''}</div>`;
+        feedbackList.appendChild(div);
+    });
 }

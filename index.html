@@ -11,9 +11,10 @@
         <img id="avatarImg" src="https://ui-avatars.com/api/?name=Guest&background=6e45e2&color=fff&rounded=true" alt="Avatar" class="avatar-img">
         <input type="file" id="avatarInput" accept="image/*" style="display:none;">
         <button id="changeAvatarBtn" class="avatar-btn">Change Avatar</button>
+        <button id="messagesBtn" class="avatar-btn" style="display: none;">✉️ Messages</button>
     </div>
     <div class="signup-container">
-        <button id="darkModeBtn" class="dark-mode-toggle">🌙</button>
+        <button class="dark-mode-toggle">🌙</button>
         <h2>Sign Up</h2>
         <form id="signupForm">
             <input type="text" id="username" placeholder="Username" required>
@@ -27,7 +28,7 @@
         <a href="#" id="showLogin">Already have an account? Log in</a>
     </div>
     <div class="login-container" style="display:none;">
-        <button id="darkModeBtn2" class="dark-mode-toggle">🌙</button>
+        <button class="dark-mode-toggle">🌙</button>
         <h2>Log In</h2>
         <form id="loginForm">
             <input type="text" id="loginUsername" placeholder="Username" required>
@@ -41,7 +42,7 @@
         <a href="#" id="showSignup">Don't have an account? Sign up</a>
     </div>
     <div class="comments-container" style="display:none;">
-        <button id="darkModeBtn3" class="dark-mode-toggle">🌙</button>
+        <button class="dark-mode-toggle">🌙</button>
         <h2>Comments & Reviews</h2>
         <p class="markdown-info">Supports **Markdown** formatting.</p>
         <form id="commentForm">
@@ -64,22 +65,46 @@
                 <option value="most-liked">Most Liked</option>
             </select>
         </div>
+        <div class="loader-wrapper" id="commentsLoaderWrapper" style="display: none;">
+            <div class="loader"></div>
+        </div>
         <div id="commentsList"></div>
         <button id="showFeedbackBtn" style="margin-top:2em;">Go to Feedback</button>
         <button id="logoutBtn" style="margin-top:1em;">Log Out</button>
     </div>
     <div class="profile-container" style="display:none;">
-        <button id="darkModeBtn4" class="dark-mode-toggle">🌙</button>
+        <button class="dark-mode-toggle">🌙</button>
         <div id="profileHeader">
             <img id="profileAvatar" src="" alt="User Avatar" class="avatar-img">
-            <h2 id="profileUsername"></h2>
+            <div class="profile-main-info">
+                <h2 id="profileUsername"></h2>
+                <button id="messageUserBtn" class="avatar-btn">Message</button>
+            </div>
         </div>
+        <div id="profileBadges" class="profile-badges"></div>
         <h3>User's Comments</h3>
         <div id="profileCommentsList"></div>
         <button id="backToCommentsBtn" style="margin-top:2em;">Back to All Comments</button>
     </div>
+    <div class="messaging-container" style="display:none;">
+        <button class="dark-mode-toggle">🌙</button>
+        <h2>Direct Messages</h2>
+        <div class="chat-layout">
+            <div id="userList" class="user-list-panel">
+                </div>
+            <div id="chatWindow" class="chat-window-panel">
+                <div id="chatHeader" class="chat-header">Select a user to start chatting</div>
+                <div id="messageList" class="message-list"></div>
+                <form id="messageForm" class="message-form">
+                    <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+        <button id="backToCommentsFromMessagesBtn" style="margin-top:1em;">Back to Comments</button>
+    </div>
     <div class="feedback-container" style="display:none;">
-        <button id="darkModeBtn5" class="dark-mode-toggle">🌙</button>
+        <button class="dark-mode-toggle">🌙</button>
         <h2>Feedback</h2>
         <form id="feedbackForm">
             <textarea id="feedbackInput" placeholder="Your feedback..." required></textarea>
@@ -88,6 +113,16 @@
         <div id="feedbackList"></div>
         <button id="backToCommentsFromFeedbackBtn" style="margin-top:2em;">Back to Comments</button>
     </div>
+
+    <div id="floatingChatTab" class="floating-chat-tab" style="display: none;">
+        <div id="chatTabHeader" class="chat-tab-header">
+            <span>Messages</span>
+            <span id="chatTabToggle">-</span>
+        </div>
+        <div id="chatTabBody" class="chat-tab-body">
+            </div>
+    </div>
+
     <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
     <script src="Javascript/main.js"></script>
 </body>
