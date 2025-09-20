@@ -1,7 +1,24 @@
+// --- Firebase Configuration ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA0J3ILJodB-uVeYdvYoTy0A6xhoj2dsiE",
+  authDomain: "avakash-comments.firebaseapp.com",
+  projectId: "avakash-comments",
+  storageBucket: "avakash-comments.appspot.com",
+  messagingSenderId: "169894413332",
+  appId: "1:169894413332:web:ba1feeb37ff3c8d4e1d301"
+};
+
+// --- Initialize Firebase ---
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+const commentsCollection = db.collection('comments');
+
 // --- GLOBAL STATE ---
 let currentSort = 'newest';
 let emojiPicker = null;
 let currentChatPartner = null;
+let allComments = []; // This will hold all comments from the database
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -10,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initForms();
     initScrollToggleButton();
 
-    // --- LOGIN PERSISTENCE LOGIC ---
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (loggedInUser) {
         setAvatar(loggedInUser);
@@ -68,9 +84,7 @@ function initForms() {
 function initScrollToggleButton() {
     const scrollBtn = document.getElementById('scrollToggleBtn');
     if (!scrollBtn) return;
-
     scrollBtn.dataset.state = 'down';
-
     window.onscroll = () => {
         if (window.scrollY < 50) {
             if (scrollBtn.dataset.state !== 'down') {
@@ -86,7 +100,6 @@ function initScrollToggleButton() {
             }
         }
     };
-
     scrollBtn.onclick = () => {
         if (scrollBtn.dataset.state === 'down') {
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
@@ -121,7 +134,7 @@ function setLoading(button, isLoading) {
     }
 }
 
-// --- AVATAR & AUTHENTICATION ---
+// --- AVATAR & AUTHENTICATION (Still using LocalStorage for simplicity) ---
 function setAvatar(username) {
     const avatarImg = document.getElementById('avatarImg');
     const userAvatar = localStorage.getItem('avatar');
@@ -197,10 +210,15 @@ function handleLogout() {
     setAvatar(null);
 }
 
-// --- COMMENTS SECTION LOGIC ---
+// --- COMMENTS SECTION LOGIC (NOW USING FIREBASE) ---
 function showCommentsSection(username) {
     showContainer('.comments-container');
-    renderComments();
+    
+    // Listen for real-time updates from Firebase
+    commentsCollection.onSnapshot(snapshot => {
+        allComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderComments();
+    });
 
     const fileInput = document.getElementById('commentFileInput');
     const fileNameDisplay = document.getElementById('fileName');
@@ -220,7 +238,7 @@ function showCommentsSection(username) {
     const postCommentBtn = document.getElementById('postCommentBtn');
     postCommentBtn.dataset.originalText = 'Post';
 
-    document.getElementById('commentForm').onsubmit = function(e) {
+    document.getElementById('commentForm').onsubmit = async function(e) {
         e.preventDefault();
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
@@ -228,39 +246,33 @@ function showCommentsSection(username) {
         
         setLoading(postCommentBtn, true);
 
-        const saveComment = (attachmentData = null) => {
-            let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-            comments.push({ 
-                id: Date.now(), 
-                user: username, 
-                text: commentText, 
-                timestamp: new Date().toISOString(), 
-                likedBy: [], 
-                replies: [], 
-                attachment: attachmentData 
-            });
-            localStorage.setItem('comments', JSON.stringify(comments));
-            document.getElementById('commentInput').value = '';
-            fileInput.value = '';
-            fileNameDisplay.textContent = '';
-            if (emojiPicker) emojiPicker.style.display = 'none';
-            renderComments();
-            setLoading(postCommentBtn, false);
-        };
-
+        let attachmentData = null;
         if (file) {
-            const reader = new FileReader();
-            reader.onload = (evt) => saveComment({ data: evt.target.result, type: file.type });
-            reader.readAsDataURL(file);
-        } else {
-            setTimeout(() => saveComment(), 500); // Simulate network delay
+            const filePath = `attachments/${Date.now()}_${file.name}`;
+            const fileSnapshot = await storage.ref(filePath).put(file);
+            const url = await fileSnapshot.ref.getDownloadURL();
+            attachmentData = { url: url, type: file.type };
         }
+
+        await commentsCollection.add({
+            user: username,
+            text: commentText,
+            timestamp: new Date(),
+            likedBy: [],
+            replies: [],
+            attachment: attachmentData
+        });
+
+        document.getElementById('commentInput').value = '';
+        fileInput.value = '';
+        fileNameDisplay.textContent = '';
+        if (emojiPicker) emojiPicker.style.display = 'none';
+        setLoading(postCommentBtn, false);
     };
 
-    document.getElementById('sortComments').onchange = (e) => { currentSort = e.target.value; renderComments(); };
+    document.getElementById('sortComments').onchange = () => renderComments();
     document.getElementById('logoutBtn').onclick = handleLogout;
-    
-    document.getElementById('searchInput').oninput = (e) => renderComments(null, 'commentsList', e.target.value);
+    document.getElementById('searchInput').oninput = (e) => renderComments(e.target.value);
 
     document.getElementById('commentsList').onclick = (e) => {
         const user = e.target.closest('.comment-user, .reply-user')?.dataset.user;
@@ -269,7 +281,6 @@ function showCommentsSection(username) {
             showUserProfile(user);
             return;
         }
-
         const likeBtn = e.target.closest('.like-btn');
         if (likeBtn) handleLike(likeBtn.dataset.id);
         
@@ -287,9 +298,8 @@ function showCommentsSection(username) {
     };
 }
 
-function renderComments(commentList = null, containerId = 'commentsList', searchTerm = '') {
-    const commentsContainer = document.getElementById(containerId);
-    let allComments = commentList || JSON.parse(localStorage.getItem('comments') || '[]');
+function renderComments(searchTerm = '') {
+    const commentsContainer = document.getElementById('commentsList');
     const loggedInUser = localStorage.getItem('loggedInUser');
 
     let filteredComments = allComments;
@@ -300,24 +310,19 @@ function renderComments(commentList = null, containerId = 'commentsList', search
             comment.user.toLowerCase().includes(lowerCaseSearchTerm)
         );
     }
-
-    if (!commentList) {
-        filteredComments.sort((a, b) => {
-            if (currentSort === 'newest') return new Date(b.timestamp) - new Date(a.timestamp);
-            if (currentSort === 'oldest') return new Date(a.timestamp) - new Date(b.timestamp);
-            if (currentSort === 'most-liked') {
-                const likesA = a.likedBy ? a.likedBy.length : 0;
-                const likesB = b.likedBy ? b.likedBy.length : 0;
-                return likesB - likesA;
-            }
-            return 0;
-        });
-    }
+    
+    const sortOrder = document.getElementById('sortComments').value;
+    filteredComments.sort((a, b) => {
+        if (sortOrder === 'newest') return b.timestamp - a.timestamp;
+        if (sortOrder === 'oldest') return a.timestamp - b.timestamp;
+        if (sortOrder === 'most-liked') return (b.likedBy?.length || 0) - (a.likedBy?.length || 0);
+        return 0;
+    });
 
     commentsContainer.innerHTML = filteredComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
     filteredComments.forEach((comment) => {
-        const likeCount = comment.likedBy ? comment.likedBy.length : 0;
-        const isLikedByCurrentUser = comment.likedBy && comment.likedBy.includes(loggedInUser);
+        const likeCount = comment.likedBy?.length || 0;
+        const isLikedByCurrentUser = comment.likedBy?.includes(loggedInUser);
         const likeBtnClass = isLikedByCurrentUser ? 'like-btn liked' : 'like-btn';
 
         let replyCountHtml = '';
@@ -336,11 +341,11 @@ function renderComments(commentList = null, containerId = 'commentsList', search
         }
 
         let attachmentHtml = '';
-        if (comment.attachment && comment.attachment.data) {
+        if (comment.attachment && comment.attachment.url) {
             if (comment.attachment.type.startsWith('image/')) {
-                attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="attachment"></div>`;
+                attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.url}" alt="attachment"></div>`;
             } else if (comment.attachment.type.startsWith('video/')) {
-                attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
+                attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.url}" controls></video></div>`;
             }
         }
 
@@ -361,33 +366,14 @@ function renderComments(commentList = null, containerId = 'commentsList', search
                     </div>
                     <div class="reply-container" id="reply-container-${comment.id}" style="display:none;">
                         <textarea id="reply-input-${comment.id}" placeholder="Write a reply..."></textarea>
-                        <button onclick="handleReply(${comment.id})">Post Reply</button>
+                        <button onclick="handleReply('${comment.id}')">Post Reply</button>
                     </div>
                 </div>
             </div>
             ${ownerActionsHtml}
         `;
-        const links = div.querySelectorAll('.comment-text a');
-        links.forEach(link => {
-            link.setAttribute('target', '_blank');
-            link.setAttribute('rel', 'noopener noreferrer');
-        });
         commentsContainer.appendChild(div);
         renderReplies(comment.id, comment.replies);
-    });
-
-    document.querySelectorAll('.reply-count').forEach(countBadge => {
-        const commentId = countBadge.dataset.id;
-        const repliesContainer = document.getElementById(`replies-${commentId}`);
-        
-        if (repliesContainer) {
-            countBadge.addEventListener('mouseover', () => {
-                repliesContainer.style.display = 'block';
-            });
-            countBadge.addEventListener('mouseout', () => {
-                repliesContainer.style.display = 'none';
-            });
-        }
     });
 }
 
@@ -397,7 +383,6 @@ function renderReplies(commentId, replies) {
         repliesContainer.innerHTML = '';
         return;
     };
-
     repliesContainer.innerHTML = '';
     replies.forEach(reply => {
         const replyDiv = document.createElement('div');
@@ -405,51 +390,45 @@ function renderReplies(commentId, replies) {
         replyDiv.innerHTML = `
             <span class="reply-user" data-user="${reply.user}">${reply.user}</span>
             <span>${reply.text}</span>
-            <span class="reply-timestamp">${new Date(reply.timestamp).toLocaleString()}</span>
+            <span class="reply-timestamp">${reply.timestamp.toDate().toLocaleString()}</span>
         `;
         repliesContainer.appendChild(replyDiv);
     });
 }
 
-function handleReply(commentId) {
+async function handleReply(commentId) {
     const replyText = document.getElementById(`reply-input-${commentId}`).value.trim();
     if (replyText) {
-        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-        const commentIdNum = parseInt(commentId, 10);
-        const comment = comments.find(c => c.id === commentIdNum);
-        if (comment) {
-            comment.replies.push({
+        const commentRef = commentsCollection.doc(commentId);
+        await commentRef.update({
+            replies: firebase.firestore.FieldValue.arrayUnion({
                 user: localStorage.getItem('loggedInUser'),
                 text: replyText,
-                timestamp: new Date().toISOString()
-            });
-            localStorage.setItem('comments', JSON.stringify(comments));
-            renderComments();
-        }
+                timestamp: new Date()
+            })
+        });
     }
 }
 
-function handleLike(commentId) {
+async function handleLike(commentId) {
     const loggedInUser = localStorage.getItem('loggedInUser');
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
+    const commentRef = commentsCollection.doc(commentId);
+    const commentDoc = await commentRef.get();
+    const commentData = commentDoc.data();
     
-    if (comment) {
-        if (!comment.likedBy) {
-            comment.likedBy = [];
-        }
-
-        const userIndex = comment.likedBy.indexOf(loggedInUser);
-
-        if (userIndex === -1) {
-            comment.likedBy.push(loggedInUser);
+    if (commentData) {
+        const likedBy = commentData.likedBy || [];
+        if (likedBy.includes(loggedInUser)) {
+            // Unlike
+            await commentRef.update({
+                likedBy: firebase.firestore.FieldValue.arrayRemove(loggedInUser)
+            });
         } else {
-            comment.likedBy.splice(userIndex, 1);
+            // Like
+            await commentRef.update({
+                likedBy: firebase.firestore.FieldValue.arrayUnion(loggedInUser)
+            });
         }
-
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
     }
 }
 
@@ -480,21 +459,16 @@ function handleDelete(commentId) {
         modal.remove();
     };
 
-    document.getElementById('confirmDeleteBtn').onclick = () => {
-        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-        const commentIdNum = parseInt(commentId, 10);
-        comments = comments.filter(c => c.id !== commentIdNum);
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
+    document.getElementById('confirmDeleteBtn').onclick = async () => {
+        await commentsCollection.doc(commentId).delete();
         modal.remove();
     };
 }
 
-function handleEdit(commentId) {
+async function handleEdit(commentId) {
     const commentTextDiv = document.getElementById(`comment-text-${commentId}`);
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
+    const commentDoc = await commentsCollection.doc(commentId).get();
+    const comment = commentDoc.data();
     if (!comment) return;
 
     if (commentTextDiv.querySelector('.edit-textarea')) {
@@ -517,24 +491,16 @@ function handleEdit(commentId) {
     commentTextDiv.appendChild(saveBtn);
 }
 
-function handleSave(commentId) {
+async function handleSave(commentId) {
     const newText = document.querySelector(`#comment-text-${commentId} .edit-textarea`).value;
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
-
-    if (comment) {
-        comment.text = newText;
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
-    }
+    await commentsCollection.doc(commentId).update({ text: newText });
 }
 
 
 // --- USER PROFILE LOGIC ---
 function showUserProfile(username) {
     showContainer('.profile-container');
-    const userComments = JSON.parse(localStorage.getItem('comments') || '[]').filter(c => c.user === username);
+    const userComments = allComments.filter(c => c.user === username);
     
     document.getElementById('profileAvatar').src = getAvatarForUser(username);
     document.getElementById('profileUsername').textContent = username;
@@ -555,6 +521,8 @@ function showUserProfile(username) {
 
 // --- MESSAGING LOGIC ---
 function showMessagingSection() {
+    // This section is still using LocalStorage for simplicity.
+    // Migrating this to Firebase would be a good next step.
     showContainer('.messaging-container');
     const loggedInUser = localStorage.getItem('loggedInUser');
     const allUsers = JSON.parse(localStorage.getItem('users') || '[]').map(u => u.username);
@@ -664,7 +632,7 @@ function updateFloatingChatTab() {
     });
 }
 
-// --- FEEDBACK SECTION LOGIC ---
+// --- FEEDBACK SECTION LOGIC (Still using LocalStorage) ---
 function showFeedbackSection() {
     showContainer('.feedback-container');
     renderFeedback();
