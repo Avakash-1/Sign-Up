@@ -552,8 +552,8 @@ body.dark-mode .reply-btn:hover {
 /* --- RESPONSIVE STYLES --- */
 @media (max-width: 768px) {
     body {
-        padding-top: 70px; /* Add space for the fixed avatar bar */
-        padding-bottom: 100px; /* Add padding to prevent content from being hidden behind floating tabs */
+        padding-top: 70px;
+        padding-bottom: 100px;
     }
 
     .signup-container, .login-container, .comments-container, .feedback-container, .profile-container, .messaging-container {
@@ -565,8 +565,14 @@ body.dark-mode .reply-btn:hover {
         box-shadow: none;
     }
 
+    .dark-mode-toggle {
+        right: auto; /* Unset the right property */
+        left: 1em;   /* Position it from the left */
+        font-size: 1.2em; /* Make it a bit smaller */
+    }
+
     .avatar-bar {
-        position: fixed; /* Make avatar bar stick to top */
+        position: fixed;
         top: 0;
         left: 0;
         right: 0;
