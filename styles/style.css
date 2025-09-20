@@ -48,6 +48,8 @@ body.dark-mode input, body.dark-mode textarea {
 }
 body.dark-mode a { color: #8a79ff; }
 body.dark-mode a:hover { color: #b06ab3; }
+body.dark-mode .markdown-info { color: #aaa; } /* Dark mode markdown info */
+
 
 /* Avatar Bar */
 .avatar-bar {
@@ -224,7 +226,19 @@ emoji-picker {
 .form-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1em; }
 .secondary-btn { background: #fff; color: #6e45e2; border: 1.5px solid #6e45e2; padding: 0.6em 1em; }
 .secondary-btn:hover { background: #6e45e2; color: #fff; }
+body.dark-mode .secondary-btn { /* Dark mode override for secondary button */
+    background: #4a4b8d; /* Darker background */
+    color: #e0e0ff; /* Lighter text */
+    border-color: #b06ab3; /* Adjusted border color */
+}
+body.dark-mode .secondary-btn:hover {
+    background: #6e45e2; /* Hover state for dark mode */
+    color: #fff;
+}
+
 .file-name-display { display: block; margin-top: 0.5em; font-size: 0.8em; color: #666; }
+body.dark-mode .file-name-display { color: #aaa; }
+
 
 /* Comments List */
 #commentsList, #feedbackList, #profileCommentsList { margin-top: 1.5em; text-align: left; }
@@ -235,6 +249,16 @@ emoji-picker {
     border-radius: 5px;
     border: 1.5px solid #6e45e2;
 }
+body.dark-mode .comments-toolbar select {
+    background: #2a2b4d;
+    color: #e0e0ff;
+    border-color: #b06ab3;
+}
+body.dark-mode .comments-toolbar option {
+    background: #2a2b4d;
+    color: #e0e0ff;
+}
+
 
 .comment {
     background: linear-gradient(to right, #6e45e2 0%, #b06ab3 100%);
@@ -278,19 +302,27 @@ emoji-picker {
 
 /* MESSAGING STYLES */
 .chat-layout { display: flex; height: 50vh; border: 1.5px solid #6e45e2; border-radius: 8px; }
+body.dark-mode .chat-layout { border-color: #b06ab3; }
+
 .user-list-panel { width: 30%; border-right: 1.5px solid #6e45e2; overflow-y: auto; }
+body.dark-mode .user-list-panel { border-color: #b06ab3; }
+
 .chat-window-panel { width: 70%; display: flex; flex-direction: column; }
 .user-list-item { padding: 1em; cursor: pointer; border-bottom: 1px solid #ddd; text-align: left; transition: background 0.2s; }
 .user-list-item:hover, .user-list-item.active { background: #e0e0ff; }
 body.dark-mode .user-list-item { border-bottom: 1px solid #4a4b8d; }
 body.dark-mode .user-list-item:hover, body.dark-mode .user-list-item.active { background: #4a4b8d; }
 .chat-header { padding: 1em; border-bottom: 1.5px solid #6e45e2; font-weight: bold; }
+body.dark-mode .chat-header { border-color: #b06ab3; }
+
 .message-list { flex-grow: 1; padding: 1em; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5em; }
 .message-item { max-width: 70%; padding: 0.5em 1em; border-radius: 12px; word-wrap: break-word; }
 .message-item.sent { background: #6e45e2; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
 .message-item.received { background: #e0e0ff; color: #333; align-self: flex-start; border-bottom-left-radius: 0; }
 body.dark-mode .message-item.received { background: #4a4b8d; color: #e0e0ff; }
 .message-form { display: flex; padding: 0.5em; border-top: 1.5px solid #6e45e2; }
+body.dark-mode .message-form { border-color: #b06ab3; }
+
 .message-form input { flex-grow: 1; margin: 0; }
 .message-form button { margin-left: 0.5em; }
 
@@ -315,6 +347,25 @@ a { color: #6e45e2; text-decoration: none; display: block; margin-top: 1em; font
 a:hover { color: #b06ab3; }
 .edit-btn, .delete-btn, .like-btn, .dislike-btn, .reply-btn { background: #fff; color: #6e45e2; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; padding: 0.2em 0.5em; margin-left: 0.2em; transition: background 0.2s, color 0.2s; }
 .edit-btn:hover, .delete-btn:hover, .like-btn:hover, .dislike-btn:hover, .reply-btn:hover { background: #b06ab3; color: #fff; }
+
+/* Dark mode for comment actions */
+body.dark-mode .edit-btn,
+body.dark-mode .delete-btn,
+body.dark-mode .like-btn,
+body.dark-mode .dislike-btn,
+body.dark-mode .reply-btn {
+    background: #4a4b8d;
+    color: #e0e0ff;
+}
+body.dark-mode .edit-btn:hover,
+body.dark-mode .delete-btn:hover,
+body.dark-mode .like-btn:hover,
+body.dark-mode .dislike-btn:hover,
+body.dark-mode .reply-btn:hover {
+    background: #6e45e2;
+    color: #fff;
+}
+
 
 /* Replies */
 .replies { margin-top: 0.5em; margin-left: 1em; }
