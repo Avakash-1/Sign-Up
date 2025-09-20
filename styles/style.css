@@ -552,6 +552,7 @@ body.dark-mode .reply-btn:hover {
 /* --- RESPONSIVE STYLES --- */
 @media (max-width: 768px) {
     body {
+        padding-top: 70px; /* Add space for the fixed avatar bar */
         padding-bottom: 100px; /* Add padding to prevent content from being hidden behind floating tabs */
     }
 
@@ -565,10 +566,19 @@ body.dark-mode .reply-btn:hover {
     }
 
     .avatar-bar {
-        position: static;
-        padding: 1em;
-        justify-content: center;
-        background: rgba(0,0,0,0.1);
+        position: fixed; /* Make avatar bar stick to top */
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        padding: 0.5em;
+        justify-content: space-between;
+        background: rgba(255,255,255,0.9);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    body.dark-mode .avatar-bar {
+        background: #23243a;
     }
 
     .comments-toolbar {
