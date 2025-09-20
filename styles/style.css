@@ -282,6 +282,15 @@ body.dark-mode .comments-toolbar option {
     background: #fff;
     margin-top: 2px;
 }
+.comment-content {
+    flex: 1;
+    margin-left: 0.7em;
+}
+.comment-owner-actions {
+    display: flex;
+    flex-direction: column;
+    margin-left: 1em;
+}
 .comment-user {
     font-weight: bold;
     color: #ffe4fa;
@@ -345,8 +354,58 @@ body.dark-mode .message-form { border-color: #b06ab3; }
 /* Buttons and Links */
 a { color: #6e45e2; text-decoration: none; display: block; margin-top: 1em; font-weight: 500; transition: color 0.2s; }
 a:hover { color: #b06ab3; }
-.edit-btn, .delete-btn, .like-btn, .dislike-btn, .reply-btn { background: #fff; color: #6e45e2; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; padding: 0.2em 0.5em; margin-left: 0.2em; transition: background 0.2s, color 0.2s; }
+
+.comment-actions {
+    position: relative;
+    margin-top: 0.5em;
+    display: flex;
+    align-items: center;
+}
+
+.edit-btn, .delete-btn, .like-btn, .dislike-btn, .reply-btn { background: #fff; color: #6e45e2; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; padding: 0.2em 0.5em; margin-left: 0.5em; transition: background 0.2s, color 0.2s; vertical-align: middle;}
 .edit-btn:hover, .delete-btn:hover, .like-btn:hover, .dislike-btn:hover, .reply-btn:hover { background: #b06ab3; color: #fff; }
+
+.like-btn.liked {
+    background: #3498db;
+    color: white;
+}
+.like-btn.liked:hover {
+    background: #2980b9;
+}
+
+
+.delete-btn {
+    background: #e74c3c;
+    color: white;
+    margin-top: 0.5em;
+}
+.delete-btn:hover {
+    background: #c0392b;
+}
+
+.save-btn {
+    margin-top: 0.5em;
+    padding: 0.3em 0.8em;
+    font-size: 0.9em;
+}
+
+.reply-count {
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 0.8em;
+    line-height: 24px;
+    text-align: center;
+    cursor: pointer;
+    margin-left: 0.5em;
+}
+.reply-count:hover {
+    background-color: #c0392b;
+}
+
 
 /* Dark mode for comment actions */
 body.dark-mode .edit-btn,
@@ -368,11 +427,44 @@ body.dark-mode .reply-btn:hover {
 
 
 /* Replies */
-.replies { margin-top: 0.5em; margin-left: 1em; }
-.reply { background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.5em; margin-bottom: 0.3em; color: #fff; }
-.reply-user { font-weight: bold; color: #ffe4fa; margin-right: 0.5em; cursor: pointer; }
+.replies {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 80px;
+    margin-bottom: 5px;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 0.5em;
+    z-index: 10;
+    min-width: 250px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #ddd;
+}
+.reply {
+    background: #f1f1f1;
+    color: #333;
+    border-radius: 4px;
+    padding: 0.5em;
+    margin-bottom: 0.3em;
+    font-size: 0.9em;
+}
+.reply-user {
+    font-weight: bold;
+    color: #6e45e2;
+    margin-right: 0.5em;
+    cursor: pointer;
+}
 .reply-user:hover { text-decoration: underline; }
-.reply-timestamp { font-size: 0.75em; color: #e0e0ff; margin-left: 0.5em; }
+.reply-timestamp {
+    font-size: 0.75em;
+    color: #777;
+    margin-left: 0.5em;
+    display: block;
+    text-align: right;
+}
 
 /* Feedback */
 .feedback-item { background: linear-gradient(to right, #2193b0 0%, #6dd5ed 100%); color: #23243a; border-radius: 10px; padding: 1em; margin-bottom: 1em; box-shadow: 0 2px 8px rgba(110,69,226,0.10); word-break: break-word; }

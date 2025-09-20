@@ -30,9 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // --- UI INITIALIZATION FUNCTIONS ---
 function initDarkMode() {
-    document.querySelector('.dark-mode-toggle').onclick = () => {
-        document.body.classList.toggle('dark-mode');
-    };
+    document.querySelectorAll('.dark-mode-toggle').forEach(button => {
+        button.onclick = () => {
+            document.body.classList.toggle('dark-mode');
+        };
+    });
 }
 
 function initNavigation() {
@@ -187,7 +189,15 @@ function showCommentsSection(username) {
 
         const saveComment = (attachmentData = null) => {
             let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-            comments.push({ id: Date.now(), user: username, text: commentText, timestamp: new Date().toISOString(), likes: 0, dislikes: 0, replies: [], attachment: attachmentData });
+            comments.push({ 
+                id: Date.now(), 
+                user: username, 
+                text: commentText, 
+                timestamp: new Date().toISOString(), 
+                likedBy: [], 
+                replies: [], 
+                attachment: attachmentData 
+            });
             localStorage.setItem('comments', JSON.stringify(comments));
             document.getElementById('commentInput').value = '';
             fileInput.value = '';
@@ -207,21 +217,25 @@ function showCommentsSection(username) {
 
     document.getElementById('sortComments').onchange = (e) => { currentSort = e.target.value; renderComments(); };
     document.getElementById('logoutBtn').onclick = handleLogout;
+    
     document.getElementById('commentsList').onclick = (e) => {
         const user = e.target.closest('.comment-user, .reply-user')?.dataset.user;
         if (user) showUserProfile(user);
 
         const likeBtn = e.target.closest('.like-btn');
-        if (likeBtn) {
-            const commentId = likeBtn.dataset.id;
-            let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-            const comment = comments.find(c => c.id == commentId);
-            if (comment) {
-                comment.likes = (comment.likes || 0) + 1;
-                localStorage.setItem('comments', JSON.stringify(comments));
-                renderComments();
-            }
-        }
+        if (likeBtn) handleLike(likeBtn.dataset.id);
+        
+        const replyBtn = e.target.closest('.reply-btn');
+        if (replyBtn) toggleReplyBox(replyBtn.dataset.id);
+
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (deleteBtn) handleDelete(deleteBtn.dataset.id);
+
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) handleEdit(editBtn.dataset.id);
+
+        const saveBtn = e.target.closest('.save-btn');
+        if (saveBtn) handleSave(saveBtn.dataset.id);
     };
 }
 
@@ -234,26 +248,67 @@ function renderComments(commentList = null, containerId = 'commentsList') {
         comments.sort((a, b) => {
             if (currentSort === 'newest') return new Date(b.timestamp) - new Date(a.timestamp);
             if (currentSort === 'oldest') return new Date(a.timestamp) - new Date(b.timestamp);
-            if (currentSort === 'most-liked') return (b.likes || 0) - (a.likes || 0);
+            if (currentSort === 'most-liked') {
+                const likesA = a.likedBy ? a.likedBy.length : 0;
+                const likesB = b.likedBy ? b.likedBy.length : 0;
+                return likesB - likesA;
+            }
             return 0;
         });
     }
 
     commentsContainer.innerHTML = comments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
     comments.forEach((comment) => {
+        const likeCount = comment.likedBy ? comment.likedBy.length : 0;
+        const isLikedByCurrentUser = comment.likedBy && comment.likedBy.includes(loggedInUser);
+        const likeBtnClass = isLikedByCurrentUser ? 'like-btn liked' : 'like-btn';
+
+        let replyCountHtml = '';
+        if (comment.replies && comment.replies.length > 0) {
+            replyCountHtml = `<div class="reply-count" data-id="${comment.id}">${comment.replies.length}</div>`;
+        }
+
+        let ownerActionsHtml = '';
+        if (loggedInUser === comment.user) {
+            ownerActionsHtml = `
+                <div class="comment-owner-actions">
+                    <button class="edit-btn" data-id="${comment.id}">Edit</button>
+                    <button class="delete-btn" data-id="${comment.id}">Delete</button>
+                </div>
+            `;
+        }
+
+        let attachmentHtml = '';
+        if (comment.attachment && comment.attachment.data) {
+            if (comment.attachment.type.startsWith('image/')) {
+                attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="attachment"></div>`;
+            } else if (comment.attachment.type.startsWith('video/')) {
+                attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
+            }
+        }
+
         const div = document.createElement('div');
         div.className = 'comment';
         div.innerHTML = `
             <div style="display: flex; align-items: flex-start; flex: 1;">
                 <img src="${getAvatarForUser(comment.user)}" class="comment-avatar" alt="avatar">
-                <div style="margin-left:0.7em;flex:1;">
+                <div class="comment-content">
                     <span class="comment-user" data-user="${comment.user}">${comment.user}</span>
-                    <div class="comment-text">${marked.parse(comment.text || '')}</div>
+                    <div class="comment-text" id="comment-text-${comment.id}">${marked.parse(comment.text || '')}</div>
+                    ${attachmentHtml}
                     <div class="comment-actions">
-                        <button class="like-btn" data-id="${comment.id}">👍 ${comment.likes || 0}</button>
+                        <button class="${likeBtnClass}" data-id="${comment.id}">👍 ${likeCount}</button>
+                        ${replyCountHtml}
+                        <button class="reply-btn" data-id="${comment.id}">Reply</button>
+                        <div class="replies" id="replies-${comment.id}"></div>
+                    </div>
+                    <div class="reply-container" id="reply-container-${comment.id}" style="display:none;">
+                        <textarea id="reply-input-${comment.id}" placeholder="Write a reply..."></textarea>
+                        <button onclick="handleReply(${comment.id})">Post Reply</button>
                     </div>
                 </div>
             </div>
+            ${ownerActionsHtml}
         `;
         const links = div.querySelectorAll('.comment-text a');
         links.forEach(link => {
@@ -261,8 +316,141 @@ function renderComments(commentList = null, containerId = 'commentsList') {
             link.setAttribute('rel', 'noopener noreferrer');
         });
         commentsContainer.appendChild(div);
+        renderReplies(comment.id, comment.replies);
+    });
+
+    document.querySelectorAll('.reply-count').forEach(countBadge => {
+        const commentId = countBadge.dataset.id;
+        const repliesContainer = document.getElementById(`replies-${commentId}`);
+        
+        if (repliesContainer) {
+            countBadge.addEventListener('mouseover', () => {
+                repliesContainer.style.display = 'block';
+            });
+            countBadge.addEventListener('mouseout', () => {
+                repliesContainer.style.display = 'none';
+            });
+        }
     });
 }
+
+function renderReplies(commentId, replies) {
+    const repliesContainer = document.getElementById(`replies-${commentId}`);
+    if (!replies || replies.length === 0) {
+        repliesContainer.innerHTML = '';
+        return;
+    };
+
+    repliesContainer.innerHTML = '';
+    replies.forEach(reply => {
+        const replyDiv = document.createElement('div');
+        replyDiv.className = 'reply';
+        replyDiv.innerHTML = `
+            <span class="reply-user" data-user="${reply.user}">${reply.user}</span>
+            <span>${reply.text}</span>
+            <span class="reply-timestamp">${new Date(reply.timestamp).toLocaleString()}</span>
+        `;
+        repliesContainer.appendChild(replyDiv);
+    });
+}
+
+function handleReply(commentId) {
+    const replyText = document.getElementById(`reply-input-${commentId}`).value.trim();
+    if (replyText) {
+        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+        const commentIdNum = parseInt(commentId, 10);
+        const comment = comments.find(c => c.id === commentIdNum);
+        if (comment) {
+            comment.replies.push({
+                user: localStorage.getItem('loggedInUser'),
+                text: replyText,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('comments', JSON.stringify(comments));
+            renderComments();
+        }
+    }
+}
+
+function handleLike(commentId) {
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+    const commentIdNum = parseInt(commentId, 10);
+    const comment = comments.find(c => c.id === commentIdNum);
+    
+    if (comment) {
+        if (!comment.likedBy) {
+            comment.likedBy = [];
+        }
+
+        const userIndex = comment.likedBy.indexOf(loggedInUser);
+
+        if (userIndex === -1) {
+            comment.likedBy.push(loggedInUser);
+        } else {
+            comment.likedBy.splice(userIndex, 1);
+        }
+
+        localStorage.setItem('comments', JSON.stringify(comments));
+        renderComments();
+    }
+}
+
+function toggleReplyBox(commentId) {
+    const replyContainer = document.getElementById(`reply-container-${commentId}`);
+    if (replyContainer) {
+        replyContainer.style.display = replyContainer.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function handleDelete(commentId) {
+    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+    const commentIdNum = parseInt(commentId, 10);
+    comments = comments.filter(c => c.id !== commentIdNum);
+    localStorage.setItem('comments', JSON.stringify(comments));
+    renderComments();
+}
+
+function handleEdit(commentId) {
+    const commentTextDiv = document.getElementById(`comment-text-${commentId}`);
+    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+    const commentIdNum = parseInt(commentId, 10);
+    const comment = comments.find(c => c.id === commentIdNum);
+    if (!comment) return;
+
+    if (commentTextDiv.querySelector('.edit-textarea')) {
+        return;
+    }
+
+    const currentText = comment.text;
+
+    const editInput = document.createElement('textarea');
+    editInput.className = 'edit-textarea';
+    editInput.value = currentText;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'save-btn';
+    saveBtn.dataset.id = commentId;
+    saveBtn.innerText = 'Save';
+
+    commentTextDiv.innerHTML = '';
+    commentTextDiv.appendChild(editInput);
+    commentTextDiv.appendChild(saveBtn);
+}
+
+function handleSave(commentId) {
+    const newText = document.querySelector(`#comment-text-${commentId} .edit-textarea`).value;
+    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+    const commentIdNum = parseInt(commentId, 10);
+    const comment = comments.find(c => c.id === commentIdNum);
+
+    if (comment) {
+        comment.text = newText;
+        localStorage.setItem('comments', JSON.stringify(comments));
+        renderComments();
+    }
+}
+
 
 // --- USER PROFILE LOGIC ---
 function showUserProfile(username) {
