@@ -1,4 +1,8 @@
 /* General Body Styles */
+* {
+    box-sizing: border-box;
+}
+
 body {
     background: linear-gradient(to top, #b06ab3 0%, #6e45e2 30%, #2193b0 70%, #6dd5ed 100%);
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -48,7 +52,7 @@ body.dark-mode input, body.dark-mode textarea {
 }
 body.dark-mode a { color: #8a79ff; }
 body.dark-mode a:hover { color: #b06ab3; }
-body.dark-mode .markdown-info { color: #aaa; } /* Dark mode markdown info */
+body.dark-mode .markdown-info { color: #aaa; }
 
 
 /* Avatar Bar */
@@ -153,7 +157,6 @@ body.dark-mode .no-messages { color: #888; }
 /* Forms & Inputs */
 input, textarea {
     width: 100%;
-    box-sizing: border-box;
     padding: 0.7em;
     margin: 0.5em 0;
     border: 1.5px solid #6e45e2;
@@ -227,13 +230,13 @@ emoji-picker {
 .form-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1em; }
 .secondary-btn { background: #fff; color: #6e45e2; border: 1.5px solid #6e45e2; padding: 0.6em 1em; }
 .secondary-btn:hover { background: #6e45e2; color: #fff; }
-body.dark-mode .secondary-btn { /* Dark mode override for secondary button */
-    background: #4a4b8d; /* Darker background */
-    color: #e0e0ff; /* Lighter text */
-    border-color: #b06ab3; /* Adjusted border color */
+body.dark-mode .secondary-btn {
+    background: #4a4b8d;
+    color: #e0e0ff;
+    border-color: #b06ab3;
 }
 body.dark-mode .secondary-btn:hover {
-    background: #6e45e2; /* Hover state for dark mode */
+    background: #6e45e2;
     color: #fff;
 }
 
@@ -552,7 +555,7 @@ body.dark-mode .reply-btn:hover {
 /* --- RESPONSIVE STYLES --- */
 @media (max-width: 768px) {
     body {
-        padding-top: 70px;
+        padding-top: 60px;
         padding-bottom: 100px;
     }
 
@@ -566,9 +569,12 @@ body.dark-mode .reply-btn:hover {
     }
 
     .dark-mode-toggle {
-        right: auto; /* Unset the right property */
-        left: 1em;   /* Position it from the left */
-        font-size: 1.2em; /* Make it a bit smaller */
+        position: fixed;
+        top: 60px;
+        left: auto;
+        right: 5px;
+        font-size: 1.1em;
+        z-index: 100;
     }
 
     .avatar-bar {
