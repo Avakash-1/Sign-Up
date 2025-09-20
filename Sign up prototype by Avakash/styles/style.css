@@ -1,0 +1,130 @@
+body {
+    background: linear-gradient(to top, #b06ab3 0%, #6e45e2 30%, #2193b0 70%, #6dd5ed 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+.signup-container, .login-container, .comments-container {
+    background: rgba(255,255,255,0.95);
+    padding: 2em;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(110,69,226,0.15), 0 1.5px 6px rgba(176,106,179,0.10);
+    max-width: 400px;
+    margin: 5em auto;
+    text-align: center;
+    transition: box-shadow 0.3s;
+}
+
+.signup-container:hover, .login-container:hover, .comments-container:hover {
+    box-shadow: 0 12px 32px rgba(110,69,226,0.25), 0 2px 8px rgba(176,106,179,0.15);
+}
+
+input, textarea {
+    width: 90%;
+    padding: 0.7em;
+    margin: 0.5em 0;
+    border: 1.5px solid #6e45e2;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.2s;
+    resize: vertical;
+}
+
+input:focus, textarea:focus {
+    border-color: #b06ab3;
+    outline: none;
+}
+
+button {
+    background: linear-gradient(to top, #6e45e2 0%, #2193b0 100%);
+    color: #fff;
+    border: none;
+    padding: 0.7em 2em;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(110,69,226,0.10);
+    transition: background 0.3s, color 0.3s;
+}
+
+button:hover {
+    background: linear-gradient(to top, #b06ab3 0%, #6dd5ed 100%);
+    color: #2193b0;
+}
+
+a {
+    color: #6e45e2;
+    text-decoration: none;
+    display: block;
+    margin-top: 1em;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: #b06ab3;
+}
+
+.show-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #6e45e2;
+    cursor: pointer;
+    font-size: 0.95em;
+    padding: 0 0.5em;
+    font-weight: bold;
+}
+.show-btn:focus {
+    outline: none;
+    color: #b06ab3;
+}
+
+#commentsList {
+    margin-top: 1.5em;
+    text-align: left;
+}
+
+.comment {
+    background: linear-gradient(to right, #6e45e2 0%, #b06ab3 100%);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1em;
+    margin-bottom: 1em;
+    box-shadow: 0 2px 8px rgba(110,69,226,0.10);
+    word-break: break-word;
+}
+
+.comment-user {
+    font-weight: bold;
+    color: #ffe4fa;
+    margin-bottom: 0.5em;
+    display: block;
+}
+
+textarea {
+    min-height: 60px;
+    max-height: 200px;
+}
+/* Add to d:\Sign up prototype by Avakash\styles\style.css */
+.edit-btn, .delete-btn {
+    background: #fff;
+    color: #6e45e2;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 0.2em 0.5em;
+    margin-left: 0.2em;
+    transition: background 0.2s, color 0.2s;
+}
+.edit-btn:hover, .delete-btn:hover {
+    background: #b06ab3;
+    color: #fff;
+}
