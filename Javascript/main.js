@@ -8,22 +8,20 @@ document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
     initNavigation();
     initForms();
+    initScrollToggleButton();
 
     // --- LOGIN PERSISTENCE LOGIC ---
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (loggedInUser) {
-        // If a user is found, show the main app view
         setAvatar(loggedInUser);
         document.getElementById('messagesBtn').style.display = 'inline-block';
         document.getElementById('floatingChatTab').style.display = 'block';
         updateFloatingChatTab();
-        showCommentsSection(loggedInUser); // Directly go to comments section
+        showCommentsSection(loggedInUser);
     } else {
-        // If no user is logged in, show the sign-up page
         setAvatar(null);
         showContainer('.signup-container');
     }
-    // Make the body visible after the initial view is set
     document.body.style.visibility = 'visible';
 });
 
@@ -46,14 +44,13 @@ function initNavigation() {
     document.getElementById('messagesBtn').onclick = showMessagingSection;
     document.getElementById('backToCommentsFromMessagesBtn').onclick = () => showContainer('.comments-container');
 
-    // Floating chat tab toggle logic
     document.getElementById('chatTabHeader').onclick = (e) => {
         if (e.target.id === 'chatTabToggle') {
             const tab = document.getElementById('floatingChatTab');
             tab.classList.toggle('minimized');
             e.target.textContent = tab.classList.contains('minimized') ? '+' : '-';
         } else {
-             showMessagingSection(); // Open full message window if header is clicked
+             showMessagingSection();
         }
     };
 }
@@ -62,12 +59,41 @@ function initForms() {
     document.getElementById('signupForm').onsubmit = handleSignup;
     document.getElementById('loginForm').onsubmit = handleLogin;
     document.getElementById('feedbackForm').onsubmit = handleFeedback;
-
     document.getElementById('toggleSignupPassword').onclick = (e) => togglePassword(e, 'password');
     document.getElementById('toggleLoginPassword').onclick = (e) => togglePassword(e, 'loginPassword');
-
     document.getElementById('changeAvatarBtn').onclick = () => document.getElementById('avatarInput').click();
     document.getElementById('avatarInput').onchange = handleAvatarChange;
+}
+
+function initScrollToggleButton() {
+    const scrollBtn = document.getElementById('scrollToggleBtn');
+    if (!scrollBtn) return;
+
+    scrollBtn.dataset.state = 'down';
+
+    window.onscroll = () => {
+        if (window.scrollY < 50) {
+            if (scrollBtn.dataset.state !== 'down') {
+                scrollBtn.innerHTML = '▼';
+                scrollBtn.title = 'Go to Bottom';
+                scrollBtn.dataset.state = 'down';
+            }
+        } else {
+             if (scrollBtn.dataset.state !== 'up') {
+                scrollBtn.innerHTML = '▲';
+                scrollBtn.title = 'Go to Top';
+                scrollBtn.dataset.state = 'up';
+            }
+        }
+    };
+
+    scrollBtn.onclick = () => {
+        if (scrollBtn.dataset.state === 'down') {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 }
 
 // --- UTILITY FUNCTIONS ---
@@ -83,6 +109,16 @@ function togglePassword(e, inputId) {
     const pwd = document.getElementById(inputId);
     pwd.type = pwd.type === 'password' ? 'text' : 'password';
     e.target.textContent = pwd.type === 'password' ? 'Show' : 'Hide';
+}
+
+function setLoading(button, isLoading) {
+    if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner"></span>';
+    } else {
+        button.disabled = false;
+        button.innerHTML = button.dataset.originalText;
+    }
 }
 
 // --- AVATAR & AUTHENTICATION ---
@@ -181,11 +217,16 @@ function showCommentsSection(username) {
         emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
     };
 
+    const postCommentBtn = document.getElementById('postCommentBtn');
+    postCommentBtn.dataset.originalText = 'Post';
+
     document.getElementById('commentForm').onsubmit = function(e) {
         e.preventDefault();
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
         if (!commentText && !file) return;
+        
+        setLoading(postCommentBtn, true);
 
         const saveComment = (attachmentData = null) => {
             let comments = JSON.parse(localStorage.getItem('comments') || '[]');
@@ -204,6 +245,7 @@ function showCommentsSection(username) {
             fileNameDisplay.textContent = '';
             if (emojiPicker) emojiPicker.style.display = 'none';
             renderComments();
+            setLoading(postCommentBtn, false);
         };
 
         if (file) {
@@ -211,7 +253,7 @@ function showCommentsSection(username) {
             reader.onload = (evt) => saveComment({ data: evt.target.result, type: file.type });
             reader.readAsDataURL(file);
         } else {
-            saveComment();
+            setTimeout(() => saveComment(), 500); // Simulate network delay
         }
     };
 
@@ -419,11 +461,33 @@ function toggleReplyBox(commentId) {
 }
 
 function handleDelete(commentId) {
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    comments = comments.filter(c => c.id !== commentIdNum);
-    localStorage.setItem('comments', JSON.stringify(comments));
-    renderComments();
+    const modal = document.createElement('div');
+    modal.id = 'deleteConfirmationModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <p>Are you sure you want to delete this comment?</p>
+            <div class="modal-actions">
+                <button id="confirmDeleteBtn" class="delete-btn">Delete</button>
+                <button id="cancelDeleteBtn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+
+    document.getElementById('cancelDeleteBtn').onclick = () => {
+        modal.remove();
+    };
+
+    document.getElementById('confirmDeleteBtn').onclick = () => {
+        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+        const commentIdNum = parseInt(commentId, 10);
+        comments = comments.filter(c => c.id !== commentIdNum);
+        localStorage.setItem('comments', JSON.stringify(comments));
+        renderComments();
+        modal.remove();
+    };
 }
 
 function handleEdit(commentId) {
@@ -610,12 +674,16 @@ function handleFeedback(e) {
     e.preventDefault();
     const feedbackText = document.getElementById('feedbackInput').value.trim();
     if (feedbackText) {
+        const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
+        sendFeedbackBtn.dataset.originalText = 'Send Feedback';
+        setLoading(sendFeedbackBtn, true);
+
         let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
         feedbacks.push({ user: localStorage.getItem('loggedInUser') || 'Anonymous', text: feedbackText, timestamp: new Date().toLocaleString() });
         localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
         document.getElementById('feedbackInput').value = '';
         
-        renderFeedback(); // Update the list immediately
+        renderFeedback();
 
         const feedbackMessage = document.getElementById('feedbackMessage');
         feedbackMessage.textContent = 'Thank you! Your feedback has been submitted.';
@@ -624,6 +692,7 @@ function handleFeedback(e) {
         setTimeout(() => {
             feedbackMessage.style.display = 'none';
             showContainer('.comments-container');
+            setLoading(sendFeedbackBtn, false);
         }, 2000); 
     }
 }
