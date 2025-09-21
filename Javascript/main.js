@@ -3,13 +3,14 @@ const firebaseConfig = {
   apiKey: "AIzaSyA0J3ILJodB-uVeYdvYoTy0A6xhoj2dsiE",
   authDomain: "avakash-comments.firebaseapp.com",
   projectId: "avakash-comments",
-  storageBucket: "avakash-comments.firebasestorage.app",
+  storageBucket: "avakash-comments.appspot.com",
   messagingSenderId: "169894413332",
   appId: "1:169894413332:web:ba1feeb37ff3c8d4e1d301"
 };
 
 // --- Initialize Firebase ---
 firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 const commentsCollection = db.collection('comments');
@@ -27,17 +28,34 @@ document.addEventListener('DOMContentLoaded', function() {
     initForms();
     initScrollToggleButton();
 
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        setAvatar(loggedInUser);
-        document.getElementById('messagesBtn').style.display = 'inline-block';
-        document.getElementById('floatingChatTab').style.display = 'block';
-        updateFloatingChatTab();
-        showCommentsSection(loggedInUser);
-    } else {
-        setAvatar(null);
-        showContainer('.signup-container');
-    }
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // User is logged in, now fetch their profile
+            const userProfileRef = db.collection('users').doc(user.uid);
+            const userProfileDoc = await userProfileRef.get();
+
+            if (userProfileDoc.exists) {
+                const username = userProfileDoc.data().username; // Get the chosen username
+                localStorage.setItem('loggedInUser', username);
+                setAvatar(username);
+                document.getElementById('messagesBtn').style.display = 'inline-block';
+                document.getElementById('floatingChatTab').style.display = 'block';
+                updateFloatingChatTab();
+                showCommentsSection(username);
+            } else {
+                console.error("No user profile found for this user!");
+                handleLogout(); // Log them out if profile is missing
+            }
+        } else {
+            // User is logged out
+            localStorage.removeItem('loggedInUser');
+            setAvatar(null);
+            showContainer('.login-container');
+            document.getElementById('messagesBtn').style.display = 'none';
+            document.getElementById('floatingChatTab').style.display = 'none';
+        }
+    });
+
     document.body.style.visibility = 'visible';
 });
 
@@ -134,7 +152,7 @@ function setLoading(button, isLoading) {
     }
 }
 
-// --- AVATAR & AUTHENTICATION (Still using LocalStorage for simplicity) ---
+// --- AVATAR & AUTHENTICATION ---
 function setAvatar(username) {
     const avatarImg = document.getElementById('avatarImg');
     const userAvatar = localStorage.getItem('avatar');
@@ -169,52 +187,62 @@ function getAvatarForUser(username) {
 
 function handleSignup(e) {
     e.preventDefault();
-    const username = document.getElementById('username').value.trim();
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
-    if (username && password) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        if (users.find(u => u.username === username)) {
-            document.getElementById('message').textContent = 'Username already exists.';
-            return;
-        }
-        users.push({ username, password });
-        localStorage.setItem('users', JSON.stringify(users));
-        document.getElementById('message').textContent = 'Sign up successful! You can now log in.';
-    }
+    const messageElement = document.getElementById('message');
+
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            return db.collection('users').doc(user.uid).set({
+                username: username,
+                email: email
+            }).then(() => {
+                messageElement.textContent = 'Sign up successful! You can now log in.';
+                messageElement.style.color = 'green';
+            });
+        })
+        .catch((error) => {
+            messageElement.textContent = error.message;
+            messageElement.style.color = 'red';
+        });
 }
 
 function handleLogin(e) {
     e.preventDefault();
-    const username = document.getElementById('loginUsername').value.trim();
+    const loginButton = e.target.querySelector('button[type="submit"]');
+    loginButton.dataset.originalText = 'Log In'; // Set original text for the spinner function
+
+    const email = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-        localStorage.setItem('loggedInUser', username);
-        setAvatar(username);
-        document.getElementById('messagesBtn').style.display = 'inline-block';
-        document.getElementById('floatingChatTab').style.display = 'block';
-        updateFloatingChatTab();
-        showCommentsSection(username);
-    } else {
-        document.getElementById('loginMessage').textContent = 'Invalid credentials.';
-    }
+    const messageElement = document.getElementById('loginMessage');
+
+    // Start the loading spinner
+    setLoading(loginButton, true);
+    messageElement.textContent = ''; // Clear previous error messages
+
+    auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            // On success, the onAuthStateChanged listener will take over.
+            // No need to stop the spinner here, as the view will change.
+        })
+        .catch((error) => {
+            // On failure, show the error and stop the spinner.
+            messageElement.textContent = error.message;
+            messageElement.style.color = 'red';
+            setLoading(loginButton, false);
+        });
 }
 
 function handleLogout() {
-    localStorage.removeItem('loggedInUser');
-    localStorage.removeItem('avatar');
-    document.getElementById('messagesBtn').style.display = 'none';
-    document.getElementById('floatingChatTab').style.display = 'none';
-    showContainer('.signup-container');
-    setAvatar(null);
+    auth.signOut();
 }
 
-// --- COMMENTS SECTION LOGIC (NOW USING FIREBASE) ---
+// --- COMMENTS SECTION LOGIC ---
 function showCommentsSection(username) {
     showContainer('.comments-container');
-    
-    // Listen for real-time updates from Firebase
+
     commentsCollection.onSnapshot(snapshot => {
         allComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderComments();
@@ -243,7 +271,7 @@ function showCommentsSection(username) {
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
         if (!commentText && !file) return;
-        
+
         setLoading(postCommentBtn, true);
 
         let attachmentData = null;
@@ -253,9 +281,11 @@ function showCommentsSection(username) {
             const url = await fileSnapshot.ref.getDownloadURL();
             attachmentData = { url: url, type: file.type };
         }
-
+        
+        const loggedInUsername = localStorage.getItem('loggedInUser');
         await commentsCollection.add({
-            user: username,
+            user: loggedInUsername,
+            author_uid: auth.currentUser.uid,
             text: commentText,
             timestamp: new Date(),
             likedBy: [],
@@ -283,7 +313,7 @@ function showCommentsSection(username) {
         }
         const likeBtn = e.target.closest('.like-btn');
         if (likeBtn) handleLike(likeBtn.dataset.id);
-        
+
         const replyBtn = e.target.closest('.reply-btn');
         if (replyBtn) toggleReplyBox(replyBtn.dataset.id);
 
@@ -305,12 +335,12 @@ function renderComments(searchTerm = '') {
     let filteredComments = allComments;
     if (searchTerm) {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        filteredComments = allComments.filter(comment => 
+        filteredComments = allComments.filter(comment =>
             comment.text.toLowerCase().includes(lowerCaseSearchTerm) ||
             comment.user.toLowerCase().includes(lowerCaseSearchTerm)
         );
     }
-    
+
     const sortOrder = document.getElementById('sortComments').value;
     filteredComments.sort((a, b) => {
         if (sortOrder === 'newest') return b.timestamp - a.timestamp;
@@ -319,7 +349,7 @@ function renderComments(searchTerm = '') {
         return 0;
     });
 
-    commentsContainer.innerHTML = filteredComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
+    commentsContainer.innerHTML = filteredComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet. Be the first!</p>' : '';
     filteredComments.forEach((comment) => {
         const likeCount = comment.likedBy?.length || 0;
         const isLikedByCurrentUser = comment.likedBy?.includes(loggedInUser);
@@ -415,16 +445,14 @@ async function handleLike(commentId) {
     const commentRef = commentsCollection.doc(commentId);
     const commentDoc = await commentRef.get();
     const commentData = commentDoc.data();
-    
+
     if (commentData) {
         const likedBy = commentData.likedBy || [];
         if (likedBy.includes(loggedInUser)) {
-            // Unlike
             await commentRef.update({
                 likedBy: firebase.firestore.FieldValue.arrayRemove(loggedInUser)
             });
         } else {
-            // Like
             await commentRef.update({
                 likedBy: firebase.firestore.FieldValue.arrayUnion(loggedInUser)
             });
@@ -496,15 +524,14 @@ async function handleSave(commentId) {
     await commentsCollection.doc(commentId).update({ text: newText });
 }
 
-
 // --- USER PROFILE LOGIC ---
 function showUserProfile(username) {
     showContainer('.profile-container');
     const userComments = allComments.filter(c => c.user === username);
-    
+
     document.getElementById('profileAvatar').src = getAvatarForUser(username);
     document.getElementById('profileUsername').textContent = username;
-    
+
     const messageUserBtn = document.getElementById('messageUserBtn');
     if (username === localStorage.getItem('loggedInUser')) {
         messageUserBtn.style.display = 'none';
@@ -515,20 +542,18 @@ function showUserProfile(username) {
             openChatWith(username);
         };
     }
-    
+
     renderComments(userComments, 'profileCommentsList');
 }
 
 // --- MESSAGING LOGIC ---
 function showMessagingSection() {
-    // This section is still using LocalStorage for simplicity.
-    // Migrating this to Firebase would be a good next step.
     showContainer('.messaging-container');
     const loggedInUser = localStorage.getItem('loggedInUser');
     const allUsers = JSON.parse(localStorage.getItem('users') || '[]').map(u => u.username);
     const userListPanel = document.getElementById('userList');
     userListPanel.innerHTML = '';
-    
+
     allUsers.forEach(user => {
         if (user === loggedInUser) return;
         const userDiv = document.createElement('div');
@@ -575,7 +600,7 @@ function sendMessage(from, to, text) {
 function renderMessages(user1, user2) {
     const messageList = document.getElementById('messageList');
     const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
-    const conversation = allMessages.filter(m => 
+    const conversation = allMessages.filter(m =>
         (m.from === user1 && m.to === user2) || (m.from === user2 && m.to === user1)
     );
     conversation.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -596,7 +621,7 @@ function updateFloatingChatTab() {
 
     const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
     const chatTabBody = document.getElementById('chatTabBody');
-    
+
     const conversations = {};
     allMessages.forEach(msg => {
         if (msg.from === loggedInUser || msg.to === loggedInUser) {
@@ -632,7 +657,7 @@ function updateFloatingChatTab() {
     });
 }
 
-// --- FEEDBACK SECTION LOGIC (Still using LocalStorage) ---
+// --- FEEDBACK SECTION LOGIC ---
 function showFeedbackSection() {
     showContainer('.feedback-container');
     renderFeedback();
@@ -650,7 +675,7 @@ function handleFeedback(e) {
         feedbacks.push({ user: localStorage.getItem('loggedInUser') || 'Anonymous', text: feedbackText, timestamp: new Date().toLocaleString() });
         localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
         document.getElementById('feedbackInput').value = '';
-        
+
         renderFeedback();
 
         const feedbackMessage = document.getElementById('feedbackMessage');
@@ -661,7 +686,7 @@ function handleFeedback(e) {
             feedbackMessage.style.display = 'none';
             showContainer('.comments-container');
             setLoading(sendFeedbackBtn, false);
-        }, 2000); 
+        }, 2000);
     }
 }
 
