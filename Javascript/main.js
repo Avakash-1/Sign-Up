@@ -70,13 +70,28 @@ function initDarkMode() {
 }
 
 function initNavigation() {
-    document.getElementById('showLogin').onclick = () => showContainer('.login-container');
-    document.getElementById('showSignup').onclick = () => showContainer('.signup-container');
+    document.getElementById('showLogin').onclick = () => {
+        if (commentsListenerUnsubscribe) commentsListenerUnsubscribe();
+        showContainer('.login-container');
+    };
+    document.getElementById('showSignup').onclick = () => {
+        if (commentsListenerUnsubscribe) commentsListenerUnsubscribe();
+        showContainer('.signup-container');
+    };
     document.getElementById('showFeedbackBtn').onclick = showFeedbackSection;
-    document.getElementById('backToCommentsBtn').onclick = () => showContainer('.comments-container');
-    document.getElementById('backToCommentsFromFeedbackBtn').onclick = () => showContainer('.comments-container');
+    document.getElementById('backToCommentsBtn').onclick = () => {
+        if (profileCommentsListenerUnsubscribe) profileCommentsListenerUnsubscribe();
+        showContainer('.comments-container');
+    };
+    document.getElementById('backToCommentsFromFeedbackBtn').onclick = () => {
+        if (feedbackListenerUnsubscribe) feedbackListenerUnsubscribe();
+        showContainer('.comments-container');
+    };
     document.getElementById('messagesBtn').onclick = showMessagingSection;
-    document.getElementById('backToCommentsFromMessagesBtn').onclick = () => showContainer('.comments-container');
+    document.getElementById('backToCommentsFromMessagesBtn').onclick = () => {
+        if (messagesListenerUnsubscribe) messagesListenerUnsubscribe();
+        showContainer('.comments-container');
+    };
 
     document.getElementById('chatTabHeader').onclick = (e) => {
         if (e.target.id === 'chatTabToggle') {
@@ -213,9 +228,9 @@ async function handleSignup(e) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        // Automatically log the user in and move to the comments section
         localStorage.setItem('loggedInUser', username);
-        messageEl.textContent = 'Sign up successful! You can now log in.';
-        setTimeout(() => showCommentsSection(username), 1500);
+        showCommentsSection(username);
     } catch (error) {
         messageEl.textContent = `Error: ${error.message}`;
     }
@@ -318,25 +333,44 @@ function showCommentsSection(username) {
     
     document.getElementById('searchInput').oninput = (e) => renderComments();
     
+    // Using event delegation for all comment actions
     document.getElementById('commentsList').onclick = (e) => {
-        const user = e.target.closest('.comment-user, .reply-user')?.dataset.user;
+        const target = e.target;
+        const commentElement = target.closest('.comment');
+        if (!commentElement) return;
+
+        const commentId = commentElement.querySelector('[data-id]')?.dataset.id;
+        const user = target.closest('.comment-user, .reply-user')?.dataset.user;
+
         if (user) {
             e.preventDefault();
             showUserProfile(user);
             return;
         }
-        const likeBtn = e.target.closest('.like-btn');
-        if (likeBtn) handleLike(likeBtn.dataset.id);
-        const replyBtn = e.target.closest('.reply-btn');
-        if (replyBtn) toggleReplyBox(replyBtn.dataset.id);
-        const deleteBtn = e.target.closest('.delete-btn');
-        if (deleteBtn) handleDelete(deleteBtn.dataset.id);
-        const editBtn = e.target.closest('.edit-btn');
-        if (editBtn) handleEdit(editBtn.dataset.id);
-        const saveBtn = e.target.closest('.save-btn');
-        if (saveBtn) handleSave(saveBtn.dataset.id);
+
+        const actionBtn = target.closest('.edit-btn, .delete-btn, .like-btn, .reply-btn, .save-btn');
+        if (!actionBtn) return;
+        
+        const action = actionBtn.className.split(' ')[0];
+        
+        if (action === 'like-btn') handleLike(commentId);
+        if (action === 'reply-btn') toggleReplyBox(commentId);
+        if (action === 'delete-btn') handleDelete(commentId);
+        if (action === 'edit-btn') handleEdit(commentId);
+        if (action === 'save-btn') handleSave(commentId);
+        
+        if (target.matches('.reply-count')) {
+            const repliesContainer = document.getElementById(`replies-${commentId}`);
+            if (repliesContainer) {
+                repliesContainer.style.display = repliesContainer.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+        // Additional check for the post-reply button
+        if (target.matches('.post-reply-btn')) {
+            const replyCommentId = target.dataset.id;
+            handleReply(replyCommentId);
+        }
     };
-    
 }
 
 function renderComments(query = null, containerId = 'commentsList') {
@@ -420,11 +454,11 @@ function renderComments(query = null, containerId = 'commentsList') {
                             <button class="${likeBtnClass}" data-id="${comment.id}">👍 ${likeCount}</button>
                             ${replyCountHtml}
                             <button class="reply-btn" data-id="${comment.id}">Reply</button>
-                            <div class="replies" id="replies-${comment.id}"></div>
                         </div>
                         <div class="reply-container" id="reply-container-${comment.id}" style="display:none;">
+                            <div class="replies" id="replies-${comment.id}"></div>
                             <textarea id="reply-input-${comment.id}" placeholder="Write a reply..."></textarea>
-                            <button onclick="handleReply('${comment.id}')">Post Reply</button>
+                            <button data-id="${comment.id}" class="post-reply-btn">Post Reply</button>
                         </div>
                     </div>
                 </div>
@@ -611,7 +645,14 @@ function showUserProfile(username) {
         };
     }
     
-    renderComments({ where: ["user", "==", username] }, 'profileCommentsList');
+    if (profileCommentsListenerUnsubscribe) profileCommentsListenerUnsubscribe();
+    profileCommentsListenerUnsubscribe = db.collection("comments").where("user", "==", username).onSnapshot((querySnapshot) => {
+        const userComments = [];
+        querySnapshot.forEach((doc) => {
+            userComments.push({ id: doc.id, ...doc.data() });
+        });
+        renderComments(userComments, 'profileCommentsList');
+    });
 }
 
 // --- MESSAGING LOGIC ---
@@ -641,7 +682,6 @@ function showMessagingSection() {
         if (text && currentChatPartner) {
             sendMessage(loggedInUser, currentChatPartner, text);
             messageInput.value = '';
-            renderMessages(loggedInUser, currentChatPartner);
         }
     };
 
@@ -662,10 +702,15 @@ function openChatWith(username) {
 }
 
 function sendMessage(from, to, text) {
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    const otherUser = currentChatPartner;
+    const participants = [loggedInUser, otherUser].sort();
+    
     db.collection("messages").add({
         from: from,
         to: to,
         text: text,
+        participants: participants,
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(error => console.error("Error sending message: ", error));
 }
@@ -674,19 +719,19 @@ function renderMessages(user1, user2) {
     const messageList = document.getElementById('messageList');
     if (messagesListenerUnsubscribe) messagesListenerUnsubscribe();
     
+    const participants = [user1, user2].sort();
+
     messagesListenerUnsubscribe = db.collection("messages")
-      .where("participants", "array-contains-any", [user1, user2])
+      .where("participants", "==", participants)
       .orderBy("timestamp", "asc")
       .onSnapshot(querySnapshot => {
         messageList.innerHTML = '';
         querySnapshot.forEach(doc => {
             const msg = doc.data();
-            if ((msg.from === user1 && msg.to === user2) || (msg.from === user2 && msg.to === user1)) {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `message-item ${msg.from === user1 ? 'sent' : 'received'}`;
-                msgDiv.textContent = msg.text;
-                messageList.appendChild(msgDiv);
-            }
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message-item ${msg.from === user1 ? 'sent' : 'received'}`;
+            msgDiv.textContent = msg.text;
+            messageList.appendChild(msgDiv);
         });
         messageList.scrollTop = messageList.scrollHeight;
     });
@@ -707,7 +752,7 @@ function updateFloatingChatTab() {
         querySnapshot.forEach(doc => {
             const msg = doc.data();
             const partner = msg.from === loggedInUser ? msg.to : msg.from;
-            if (!conversations[partner] || new Date(msg.timestamp) > new Date(conversations[partner].timestamp)) {
+            if (!conversations[partner] || new Date(msg.timestamp.toDate()) > new Date(conversations[partner].timestamp.toDate())) {
                 conversations[partner] = msg;
             }
         });
