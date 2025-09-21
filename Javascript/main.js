@@ -3,7 +3,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyA0J3ILJodB-uVeYdvYoTy0A6xhoj2dsiE",
   authDomain: "avakash-comments.firebaseapp.com",
   projectId: "avakash-comments",
-  storageBucket: "avakash-comments.appspot.com",
+  storageBucket: "avakash-comments.firebasestorage.app",
   messagingSenderId: "169894413332",
   appId: "1:169894413332:web:ba1feeb37ff3c8d4e1d301"
 };
