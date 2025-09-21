@@ -2,6 +2,25 @@
 let currentSort = 'newest';
 let emojiPicker = null;
 let currentChatPartner = null;
+let commentsListenerUnsubscribe = null;
+let profileCommentsListenerUnsubscribe = null;
+let messagesListenerUnsubscribe = null;
+let feedbackListenerUnsubscribe = null;
+
+// Firebase configuration with your project details
+const firebaseConfig = {
+    apiKey: "AIzaSyA0J3ILJodB-uVeYdvYoTy0A6xhoj2dsiE",
+    authDomain: "avakash-comments.firebaseapp.com",
+    projectId: "avakash-comments",
+    storageBucket: "avakash-comments.appspot.com",
+    messagingSenderId: "169894413332",
+    appId: "YOUR_APP_ID" // You still need to replace this with your actual App ID
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -11,18 +30,33 @@ document.addEventListener('DOMContentLoaded', function() {
     initScrollToggleButton();
 
     // --- LOGIN PERSISTENCE LOGIC ---
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        setAvatar(loggedInUser);
-        document.getElementById('messagesBtn').style.display = 'inline-block';
-        document.getElementById('floatingChatTab').style.display = 'block';
-        updateFloatingChatTab();
-        showCommentsSection(loggedInUser);
-    } else {
-        setAvatar(null);
-        showContainer('.signup-container');
-    }
-    document.body.style.visibility = 'visible';
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            // User is signed in.
+            const username = user.displayName;
+            localStorage.setItem('loggedInUser', username);
+            setAvatar(username);
+            document.getElementById('messagesBtn').style.display = 'inline-block';
+            document.getElementById('floatingChatTab').style.display = 'block';
+            updateFloatingChatTab();
+            showCommentsSection(username);
+        } else {
+            // User is signed out.
+            localStorage.removeItem('loggedInUser');
+            localStorage.removeItem('avatar');
+            // Detach all listeners on logout
+            if (commentsListenerUnsubscribe) commentsListenerUnsubscribe();
+            if (profileCommentsListenerUnsubscribe) profileCommentsListenerUnsubscribe();
+            if (messagesListenerUnsubscribe) messagesListenerUnsubscribe();
+            if (feedbackListenerUnsubscribe) feedbackListenerUnsubscribe();
+            
+            document.getElementById('messagesBtn').style.display = 'none';
+            document.getElementById('floatingChatTab').style.display = 'none';
+            showContainer('.signup-container');
+            setAvatar(null);
+        }
+        document.body.style.visibility = 'visible';
+    });
 });
 
 
@@ -147,6 +181,7 @@ function handleAvatarChange(e) {
 }
 
 function getAvatarForUser(username) {
+    // This now fetches avatar from localStorage for logged-in user, and generates a new one for others
     if (username === localStorage.getItem('loggedInUser')) {
         let avatar = localStorage.getItem('avatar');
         if (avatar && avatar.trim() !== '') return avatar;
@@ -154,47 +189,75 @@ function getAvatarForUser(username) {
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=2193b0&color=fff&rounded=true`;
 }
 
-function handleSignup(e) {
+// UPDATED SIGNUP FUNCTION
+async function handleSignup(e) {
     e.preventDefault();
+    const email = document.getElementById('email').value.trim();
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
-    if (username && password) {
-        let users = JSON.parse(localStorage.getItem('users') || '[]');
-        if (users.find(u => u.username === username)) {
-            document.getElementById('message').textContent = 'Username already exists.';
+    const messageEl = document.getElementById('message');
+
+    try {
+        const usernameCheck = await db.collection("users").where("username", "==", username).get();
+        if (!usernameCheck.empty) {
+            messageEl.textContent = 'Username already exists. Please choose another one.';
             return;
         }
-        users.push({ username, password });
-        localStorage.setItem('users', JSON.stringify(users));
-        document.getElementById('message').textContent = 'Sign up successful! You can now log in.';
+
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        await userCredential.user.updateProfile({ displayName: username });
+        await db.collection("users").doc(userCredential.user.uid).set({
+            username: username,
+            email: email,
+            uid: userCredential.user.uid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        localStorage.setItem('loggedInUser', username);
+        messageEl.textContent = 'Sign up successful! You can now log in.';
+        setTimeout(() => showCommentsSection(username), 1500);
+    } catch (error) {
+        messageEl.textContent = `Error: ${error.message}`;
     }
 }
 
-function handleLogin(e) {
+// UPDATED LOGIN FUNCTION
+async function handleLogin(e) {
     e.preventDefault();
-    const username = document.getElementById('loginUsername').value.trim();
+    const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-        localStorage.setItem('loggedInUser', username);
-        setAvatar(username);
+    const loginMessageEl = document.getElementById('loginMessage');
+
+    try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        localStorage.setItem('loggedInUser', userCredential.user.displayName);
+        setAvatar(userCredential.user.displayName);
         document.getElementById('messagesBtn').style.display = 'inline-block';
         document.getElementById('floatingChatTab').style.display = 'block';
         updateFloatingChatTab();
-        showCommentsSection(username);
-    } else {
-        document.getElementById('loginMessage').textContent = 'Invalid credentials.';
+        showCommentsSection(userCredential.user.displayName);
+    } catch (error) {
+        loginMessageEl.textContent = 'Invalid credentials.';
     }
 }
 
 function handleLogout() {
-    localStorage.removeItem('loggedInUser');
-    localStorage.removeItem('avatar');
-    document.getElementById('messagesBtn').style.display = 'none';
-    document.getElementById('floatingChatTab').style.display = 'none';
-    showContainer('.signup-container');
-    setAvatar(null);
+    auth.signOut().then(() => {
+        localStorage.removeItem('loggedInUser');
+        localStorage.removeItem('avatar');
+        // Detach all listeners on logout
+        if (commentsListenerUnsubscribe) commentsListenerUnsubscribe();
+        if (profileCommentsListenerUnsubscribe) profileCommentsListenerUnsubscribe();
+        if (messagesListenerUnsubscribe) messagesListenerUnsubscribe();
+        if (feedbackListenerUnsubscribe) feedbackListenerUnsubscribe();
+
+        document.getElementById('messagesBtn').style.display = 'none';
+        document.getElementById('floatingChatTab').style.display = 'none';
+        showContainer('.signup-container');
+        setAvatar(null);
+    }).catch((error) => {
+        console.error("Error signing out: ", error);
+    });
 }
 
 // --- COMMENTS SECTION LOGIC ---
@@ -220,7 +283,7 @@ function showCommentsSection(username) {
     const postCommentBtn = document.getElementById('postCommentBtn');
     postCommentBtn.dataset.originalText = 'Post';
 
-    document.getElementById('commentForm').onsubmit = function(e) {
+    document.getElementById('commentForm').onsubmit = async function(e) {
         e.preventDefault();
         const commentText = document.getElementById('commentInput').value.trim();
         const file = fileInput.files[0];
@@ -228,40 +291,33 @@ function showCommentsSection(username) {
         
         setLoading(postCommentBtn, true);
 
-        const saveComment = (attachmentData = null) => {
-            let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-            comments.push({ 
-                id: Date.now(), 
-                user: username, 
-                text: commentText, 
-                timestamp: new Date().toISOString(), 
-                likedBy: [], 
-                replies: [], 
-                attachment: attachmentData 
-            });
-            localStorage.setItem('comments', JSON.stringify(comments));
+        const newComment = {
+            user: username, 
+            text: commentText, 
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            likedBy: [], 
+            replies: []
+        };
+        
+        // TODO: Handle file attachments
+        try {
+            await db.collection("comments").add(newComment);
             document.getElementById('commentInput').value = '';
             fileInput.value = '';
             fileNameDisplay.textContent = '';
             if (emojiPicker) emojiPicker.style.display = 'none';
-            renderComments();
+        } catch (error) {
+            console.error("Error adding document: ", error);
+        } finally {
             setLoading(postCommentBtn, false);
-        };
-
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (evt) => saveComment({ data: evt.target.result, type: file.type });
-            reader.readAsDataURL(file);
-        } else {
-            setTimeout(() => saveComment(), 500); // Simulate network delay
         }
     };
 
     document.getElementById('sortComments').onchange = (e) => { currentSort = e.target.value; renderComments(); };
     document.getElementById('logoutBtn').onclick = handleLogout;
     
-    document.getElementById('searchInput').oninput = (e) => renderComments(null, 'commentsList', e.target.value);
-
+    document.getElementById('searchInput').oninput = (e) => renderComments();
+    
     document.getElementById('commentsList').onclick = (e) => {
         const user = e.target.closest('.comment-user, .reply-user')?.dataset.user;
         if (user) {
@@ -269,129 +325,123 @@ function showCommentsSection(username) {
             showUserProfile(user);
             return;
         }
-
         const likeBtn = e.target.closest('.like-btn');
         if (likeBtn) handleLike(likeBtn.dataset.id);
-        
         const replyBtn = e.target.closest('.reply-btn');
         if (replyBtn) toggleReplyBox(replyBtn.dataset.id);
-
         const deleteBtn = e.target.closest('.delete-btn');
         if (deleteBtn) handleDelete(deleteBtn.dataset.id);
-
         const editBtn = e.target.closest('.edit-btn');
         if (editBtn) handleEdit(editBtn.dataset.id);
-
         const saveBtn = e.target.closest('.save-btn');
         if (saveBtn) handleSave(saveBtn.dataset.id);
     };
+    
 }
 
-function renderComments(commentList = null, containerId = 'commentsList', searchTerm = '') {
+function renderComments(query = null, containerId = 'commentsList') {
+    if (commentsListenerUnsubscribe) commentsListenerUnsubscribe();
+    
     const commentsContainer = document.getElementById(containerId);
-    let allComments = commentList || JSON.parse(localStorage.getItem('comments') || '[]');
     const loggedInUser = localStorage.getItem('loggedInUser');
 
-    let filteredComments = allComments;
-    if (searchTerm) {
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        filteredComments = allComments.filter(comment => 
-            comment.text.toLowerCase().includes(lowerCaseSearchTerm) ||
-            comment.user.toLowerCase().includes(lowerCaseSearchTerm)
-        );
+    let collectionRef = db.collection("comments");
+    
+    if (query && query.where) {
+        collectionRef = collectionRef.where(...query.where);
+    }
+    
+    let baseQuery = collectionRef;
+
+    const sortOption = document.getElementById('sortComments').value;
+    if (sortOption === 'newest') {
+        baseQuery = baseQuery.orderBy("timestamp", "desc");
+    } else if (sortOption === 'oldest') {
+        baseQuery = baseQuery.orderBy("timestamp", "asc");
+    } else if (sortOption === 'most-liked') {
+        // Firestore cannot sort by array length directly, so we will handle this client-side.
     }
 
-    if (!commentList) {
-        filteredComments.sort((a, b) => {
-            if (currentSort === 'newest') return new Date(b.timestamp) - new Date(a.timestamp);
-            if (currentSort === 'oldest') return new Date(a.timestamp) - new Date(b.timestamp);
-            if (currentSort === 'most-liked') {
-                const likesA = a.likedBy ? a.likedBy.length : 0;
-                const likesB = b.likedBy ? b.likedBy.length : 0;
-                return likesB - likesA;
-            }
-            return 0;
-        });
-    }
+    commentsListenerUnsubscribe = baseQuery.onSnapshot((querySnapshot) => {
+        let allComments = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    commentsContainer.innerHTML = filteredComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
-    filteredComments.forEach((comment) => {
-        const likeCount = comment.likedBy ? comment.likedBy.length : 0;
-        const isLikedByCurrentUser = comment.likedBy && comment.likedBy.includes(loggedInUser);
-        const likeBtnClass = isLikedByCurrentUser ? 'like-btn liked' : 'like-btn';
-
-        let replyCountHtml = '';
-        if (comment.replies && comment.replies.length > 0) {
-            replyCountHtml = `<div class="reply-count" data-id="${comment.id}">${comment.replies.length}</div>`;
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        if (searchTerm) {
+            allComments = allComments.filter(comment => 
+                (comment.text && comment.text.toLowerCase().includes(searchTerm)) ||
+                (comment.user && comment.user.toLowerCase().includes(searchTerm))
+            );
         }
 
-        let ownerActionsHtml = '';
-        if (loggedInUser === comment.user) {
-            ownerActionsHtml = `
-                <div class="comment-owner-actions">
-                    <button class="edit-btn" data-id="${comment.id}">Edit</button>
-                    <button class="delete-btn" data-id="${comment.id}">Delete</button>
-                </div>
-            `;
+        if (sortOption === 'most-liked') {
+            allComments.sort((a, b) => (b.likedBy ? b.likedBy.length : 0) - (a.likedBy ? a.likedBy.length : 0));
         }
-
-        let attachmentHtml = '';
-        if (comment.attachment && comment.attachment.data) {
-            if (comment.attachment.type.startsWith('image/')) {
-                attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="attachment"></div>`;
-            } else if (comment.attachment.type.startsWith('video/')) {
-                attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
-            }
-        }
-
-        const div = document.createElement('div');
-        div.className = 'comment';
-        div.innerHTML = `
-            <div style="display: flex; align-items: flex-start; flex: 1;">
-                <img src="${getAvatarForUser(comment.user)}" class="comment-avatar" alt="avatar">
-                <div class="comment-content">
-                    <a href="#" class="comment-user" data-user="${comment.user}">${comment.user}</a>
-                    <div class="comment-text" id="comment-text-${comment.id}">${marked.parse(comment.text || '')}</div>
-                    ${attachmentHtml}
-                    <div class="comment-actions">
-                        <button class="${likeBtnClass}" data-id="${comment.id}">👍 ${likeCount}</button>
-                        ${replyCountHtml}
-                        <button class="reply-btn" data-id="${comment.id}">Reply</button>
-                        <div class="replies" id="replies-${comment.id}"></div>
-                    </div>
-                    <div class="reply-container" id="reply-container-${comment.id}" style="display:none;">
-                        <textarea id="reply-input-${comment.id}" placeholder="Write a reply..."></textarea>
-                        <button onclick="handleReply(${comment.id})">Post Reply</button>
-                    </div>
-                </div>
-            </div>
-            ${ownerActionsHtml}
-        `;
-        const links = div.querySelectorAll('.comment-text a');
-        links.forEach(link => {
-            link.setAttribute('target', '_blank');
-            link.setAttribute('rel', 'noopener noreferrer');
-        });
-        commentsContainer.appendChild(div);
-        renderReplies(comment.id, comment.replies);
-    });
-
-    document.querySelectorAll('.reply-count').forEach(countBadge => {
-        const commentId = countBadge.dataset.id;
-        const repliesContainer = document.getElementById(`replies-${commentId}`);
         
-        if (repliesContainer) {
-            countBadge.addEventListener('mouseover', () => {
-                repliesContainer.style.display = 'block';
+        commentsContainer.innerHTML = allComments.length === 0 ? '<p style="color:#6e45e2;text-align:center;">No comments yet.</p>' : '';
+        allComments.forEach((comment) => {
+            const likeCount = comment.likedBy ? comment.likedBy.length : 0;
+            const isLikedByCurrentUser = comment.likedBy && comment.likedBy.includes(loggedInUser);
+            const likeBtnClass = isLikedByCurrentUser ? 'like-btn liked' : 'like-btn';
+
+            let replyCountHtml = '';
+            if (comment.replies && comment.replies.length > 0) {
+                replyCountHtml = `<div class="reply-count" data-id="${comment.id}">${comment.replies.length}</div>`;
+            }
+
+            let ownerActionsHtml = '';
+            if (loggedInUser === comment.user) {
+                ownerActionsHtml = `
+                    <div class="comment-owner-actions">
+                        <button class="edit-btn" data-id="${comment.id}">Edit</button>
+                        <button class="delete-btn" data-id="${comment.id}">Delete</button>
+                    </div>
+                `;
+            }
+
+            let attachmentHtml = '';
+            if (comment.attachment && comment.attachment.data) {
+                if (comment.attachment.type.startsWith('image/')) {
+                    attachmentHtml = `<div class="comment-attachment"><img src="${comment.attachment.data}" alt="attachment"></div>`;
+                } else if (comment.attachment.type.startsWith('video/')) {
+                    attachmentHtml = `<div class="comment-attachment"><video src="${comment.attachment.data}" controls></video></div>`;
+                }
+            }
+
+            const div = document.createElement('div');
+            div.className = 'comment';
+            div.innerHTML = `
+                <div style="display: flex; align-items: flex-start; flex: 1;">
+                    <img src="${getAvatarForUser(comment.user)}" class="comment-avatar" alt="avatar">
+                    <div class="comment-content">
+                        <a href="#" class="comment-user" data-user="${comment.user}">${comment.user}</a>
+                        <div class="comment-text" id="comment-text-${comment.id}">${marked.parse(comment.text || '')}</div>
+                        ${attachmentHtml}
+                        <div class="comment-actions">
+                            <button class="${likeBtnClass}" data-id="${comment.id}">👍 ${likeCount}</button>
+                            ${replyCountHtml}
+                            <button class="reply-btn" data-id="${comment.id}">Reply</button>
+                            <div class="replies" id="replies-${comment.id}"></div>
+                        </div>
+                        <div class="reply-container" id="reply-container-${comment.id}" style="display:none;">
+                            <textarea id="reply-input-${comment.id}" placeholder="Write a reply..."></textarea>
+                            <button onclick="handleReply('${comment.id}')">Post Reply</button>
+                        </div>
+                    </div>
+                </div>
+                ${ownerActionsHtml}
+            `;
+            const links = div.querySelectorAll('.comment-text a');
+            links.forEach(link => {
+                link.setAttribute('target', '_blank');
+                link.setAttribute('rel', 'noopener noreferrer');
             });
-            countBadge.addEventListener('mouseout', () => {
-                repliesContainer.style.display = 'none';
-            });
-        }
+            commentsContainer.appendChild(div);
+            renderReplies(comment.id, comment.replies);
+        });
     });
 }
 
-function renderReplies(commentId, replies) {
+async function renderReplies(commentId, replies) {
     const repliesContainer = document.getElementById(`replies-${commentId}`);
     if (!replies || replies.length === 0) {
         repliesContainer.innerHTML = '';
@@ -405,51 +455,58 @@ function renderReplies(commentId, replies) {
         replyDiv.innerHTML = `
             <span class="reply-user" data-user="${reply.user}">${reply.user}</span>
             <span>${reply.text}</span>
-            <span class="reply-timestamp">${new Date(reply.timestamp).toLocaleString()}</span>
+            <span class="reply-timestamp">${reply.timestamp ? reply.timestamp.toDate().toLocaleString() : ''}</span>
         `;
         repliesContainer.appendChild(replyDiv);
     });
 }
 
-function handleReply(commentId) {
+async function handleReply(commentId) {
     const replyText = document.getElementById(`reply-input-${commentId}`).value.trim();
-    if (replyText) {
-        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-        const commentIdNum = parseInt(commentId, 10);
-        const comment = comments.find(c => c.id === commentIdNum);
-        if (comment) {
-            comment.replies.push({
-                user: localStorage.getItem('loggedInUser'),
-                text: replyText,
-                timestamp: new Date().toISOString()
-            });
-            localStorage.setItem('comments', JSON.stringify(comments));
-            renderComments();
-        }
+    if (!replyText) return;
+
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    const commentRef = db.collection("comments").doc(commentId);
+    
+    const newReply = {
+        user: loggedInUser,
+        text: replyText,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    try {
+        await commentRef.update({
+            replies: firebase.firestore.FieldValue.arrayUnion(newReply)
+        });
+        document.getElementById(`reply-input-${commentId}`).value = '';
+    } catch (error) {
+        console.error("Error adding reply: ", error);
     }
 }
 
-function handleLike(commentId) {
+async function handleLike(commentId) {
     const loggedInUser = localStorage.getItem('loggedInUser');
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
+    const commentRef = db.collection("comments").doc(commentId);
     
-    if (comment) {
-        if (!comment.likedBy) {
-            comment.likedBy = [];
+    try {
+        const doc = await commentRef.get();
+        if (!doc.exists) {
+            console.error("Document does not exist!");
+            return;
         }
-
-        const userIndex = comment.likedBy.indexOf(loggedInUser);
+        
+        let likedBy = doc.data().likedBy || [];
+        const userIndex = likedBy.indexOf(loggedInUser);
 
         if (userIndex === -1) {
-            comment.likedBy.push(loggedInUser);
+            likedBy.push(loggedInUser);
         } else {
-            comment.likedBy.splice(userIndex, 1);
+            likedBy.splice(userIndex, 1);
         }
 
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
+        await commentRef.update({ likedBy: likedBy });
+    } catch (error) {
+        console.error("Error updating likes: ", error);
     }
 }
 
@@ -480,53 +537,58 @@ function handleDelete(commentId) {
         modal.remove();
     };
 
-    document.getElementById('confirmDeleteBtn').onclick = () => {
-        let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-        const commentIdNum = parseInt(commentId, 10);
-        comments = comments.filter(c => c.id !== commentIdNum);
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
-        modal.remove();
+    document.getElementById('confirmDeleteBtn').onclick = async () => {
+        try {
+            await db.collection("comments").doc(commentId).delete();
+            modal.remove();
+        } catch (error) {
+            console.error("Error removing document: ", error);
+        }
     };
 }
 
-function handleEdit(commentId) {
+async function handleEdit(commentId) {
     const commentTextDiv = document.getElementById(`comment-text-${commentId}`);
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
-    if (!comment) return;
+    const commentDoc = db.collection("comments").doc(commentId);
+    
+    try {
+        const doc = await commentDoc.get();
+        if (doc.exists) {
+            const comment = doc.data();
+            const currentText = comment.text;
 
-    if (commentTextDiv.querySelector('.edit-textarea')) {
-        return;
+            if (commentTextDiv.querySelector('.edit-textarea')) {
+                return;
+            }
+
+            const editInput = document.createElement('textarea');
+            editInput.className = 'edit-textarea';
+            editInput.value = currentText;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-btn';
+            saveBtn.dataset.id = commentId;
+            saveBtn.innerText = 'Save';
+
+            commentTextDiv.innerHTML = '';
+            commentTextDiv.appendChild(editInput);
+            commentTextDiv.appendChild(saveBtn);
+        }
+    } catch (error) {
+        console.error("Error getting document for edit: ", error);
     }
-
-    const currentText = comment.text;
-
-    const editInput = document.createElement('textarea');
-    editInput.className = 'edit-textarea';
-    editInput.value = currentText;
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'save-btn';
-    saveBtn.dataset.id = commentId;
-    saveBtn.innerText = 'Save';
-
-    commentTextDiv.innerHTML = '';
-    commentTextDiv.appendChild(editInput);
-    commentTextDiv.appendChild(saveBtn);
 }
 
-function handleSave(commentId) {
+async function handleSave(commentId) {
     const newText = document.querySelector(`#comment-text-${commentId} .edit-textarea`).value;
-    let comments = JSON.parse(localStorage.getItem('comments') || '[]');
-    const commentIdNum = parseInt(commentId, 10);
-    const comment = comments.find(c => c.id === commentIdNum);
+    const commentRef = db.collection("comments").doc(commentId);
 
-    if (comment) {
-        comment.text = newText;
-        localStorage.setItem('comments', JSON.stringify(comments));
-        renderComments();
+    try {
+        await commentRef.update({
+            text: newText
+        });
+    } catch (error) {
+        console.error("Error updating document: ", error);
     }
 }
 
@@ -534,7 +596,6 @@ function handleSave(commentId) {
 // --- USER PROFILE LOGIC ---
 function showUserProfile(username) {
     showContainer('.profile-container');
-    const userComments = JSON.parse(localStorage.getItem('comments') || '[]').filter(c => c.user === username);
     
     document.getElementById('profileAvatar').src = getAvatarForUser(username);
     document.getElementById('profileUsername').textContent = username;
@@ -550,24 +611,27 @@ function showUserProfile(username) {
         };
     }
     
-    renderComments(userComments, 'profileCommentsList');
+    renderComments({ where: ["user", "==", username] }, 'profileCommentsList');
 }
 
 // --- MESSAGING LOGIC ---
 function showMessagingSection() {
     showContainer('.messaging-container');
     const loggedInUser = localStorage.getItem('loggedInUser');
-    const allUsers = JSON.parse(localStorage.getItem('users') || '[]').map(u => u.username);
     const userListPanel = document.getElementById('userList');
     userListPanel.innerHTML = '';
     
-    allUsers.forEach(user => {
-        if (user === loggedInUser) return;
-        const userDiv = document.createElement('div');
-        userDiv.className = 'user-list-item';
-        userDiv.textContent = user;
-        userDiv.onclick = () => openChatWith(user);
-        userListPanel.appendChild(userDiv);
+    db.collection("users").onSnapshot((querySnapshot) => {
+        userListPanel.innerHTML = '';
+        querySnapshot.forEach(doc => {
+            const user = doc.data();
+            if (user.username === loggedInUser) return;
+            const userDiv = document.createElement('div');
+            userDiv.className = 'user-list-item';
+            userDiv.textContent = user.username;
+            userDiv.onclick = () => openChatWith(user.username);
+            userListPanel.appendChild(userDiv);
+        });
     });
 
     document.getElementById('messageForm').onsubmit = (e) => {
@@ -598,69 +662,79 @@ function openChatWith(username) {
 }
 
 function sendMessage(from, to, text) {
-    let messages = JSON.parse(localStorage.getItem('messages') || '[]');
-    messages.push({ from, to, text, timestamp: new Date().toISOString() });
-    localStorage.setItem('messages', JSON.stringify(messages));
-    updateFloatingChatTab();
+    db.collection("messages").add({
+        from: from,
+        to: to,
+        text: text,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(error => console.error("Error sending message: ", error));
 }
 
 function renderMessages(user1, user2) {
     const messageList = document.getElementById('messageList');
-    const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
-    const conversation = allMessages.filter(m => 
-        (m.from === user1 && m.to === user2) || (m.from === user2 && m.to === user1)
-    );
-    conversation.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    messageList.innerHTML = '';
-    conversation.forEach(msg => {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message-item ${msg.from === user1 ? 'sent' : 'received'}`;
-        msgDiv.textContent = msg.text;
-        messageList.appendChild(msgDiv);
+    if (messagesListenerUnsubscribe) messagesListenerUnsubscribe();
+    
+    messagesListenerUnsubscribe = db.collection("messages")
+      .where("participants", "array-contains-any", [user1, user2])
+      .orderBy("timestamp", "asc")
+      .onSnapshot(querySnapshot => {
+        messageList.innerHTML = '';
+        querySnapshot.forEach(doc => {
+            const msg = doc.data();
+            if ((msg.from === user1 && msg.to === user2) || (msg.from === user2 && msg.to === user1)) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message-item ${msg.from === user1 ? 'sent' : 'received'}`;
+                msgDiv.textContent = msg.text;
+                messageList.appendChild(msgDiv);
+            }
+        });
+        messageList.scrollTop = messageList.scrollHeight;
     });
-    messageList.scrollTop = messageList.scrollHeight;
 }
 
 function updateFloatingChatTab() {
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (!loggedInUser) return;
 
-    const allMessages = JSON.parse(localStorage.getItem('messages') || '[]');
-    const chatTabBody = document.getElementById('chatTabBody');
-    
-    const conversations = {};
-    allMessages.forEach(msg => {
-        if (msg.from === loggedInUser || msg.to === loggedInUser) {
+    db.collection("messages")
+      .where("participants", "array-contains", loggedInUser)
+      .orderBy("timestamp", "desc")
+      .get()
+      .then(querySnapshot => {
+        const chatTabBody = document.getElementById('chatTabBody');
+        const conversations = {};
+        
+        querySnapshot.forEach(doc => {
+            const msg = doc.data();
             const partner = msg.from === loggedInUser ? msg.to : msg.from;
             if (!conversations[partner] || new Date(msg.timestamp) > new Date(conversations[partner].timestamp)) {
                 conversations[partner] = msg;
             }
+        });
+
+        const recentConversations = Object.values(conversations)
+            .sort((a, b) => (b.timestamp ? b.timestamp.toDate() : 0) - (a.timestamp ? a.timestamp.toDate() : 0));
+
+        if (recentConversations.length === 0) {
+            chatTabBody.innerHTML = `<div class="no-messages">Start Messaging other people!</div>`;
+            return;
         }
-    });
 
-    const recentConversations = Object.values(conversations)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    if (recentConversations.length === 0) {
-        chatTabBody.innerHTML = `<div class="no-messages">Start Messaging other people!</div>`;
-        return;
-    }
-
-    chatTabBody.innerHTML = '';
-    recentConversations.forEach(msg => {
-        const partner = msg.from === loggedInUser ? msg.to : msg.from;
-        const div = document.createElement('div');
-        div.className = 'chat-preview-item';
-        div.innerHTML = `
-            <div class="chat-preview-user">${partner}</div>
-            <div class="chat-preview-text">${msg.text}</div>
-        `;
-        div.onclick = () => {
-            showMessagingSection();
-            openChatWith(partner);
-        };
-        chatTabBody.appendChild(div);
+        chatTabBody.innerHTML = '';
+        recentConversations.forEach(msg => {
+            const partner = msg.from === loggedInUser ? msg.to : msg.from;
+            const div = document.createElement('div');
+            div.className = 'chat-preview-item';
+            div.innerHTML = `
+                <div class="chat-preview-user">${partner}</div>
+                <div class="chat-preview-text">${msg.text}</div>
+            `;
+            div.onclick = () => {
+                showMessagingSection();
+                openChatWith(partner);
+            };
+            chatTabBody.appendChild(div);
+        });
     });
 }
 
@@ -673,38 +747,49 @@ function showFeedbackSection() {
 function handleFeedback(e) {
     e.preventDefault();
     const feedbackText = document.getElementById('feedbackInput').value.trim();
-    if (feedbackText) {
-        const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
-        sendFeedbackBtn.dataset.originalText = 'Send Feedback';
-        setLoading(sendFeedbackBtn, true);
+    if (!feedbackText) return;
+    
+    const sendFeedbackBtn = document.getElementById('sendFeedbackBtn');
+    sendFeedbackBtn.dataset.originalText = 'Send Feedback';
+    setLoading(sendFeedbackBtn, true);
 
-        let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-        feedbacks.push({ user: localStorage.getItem('loggedInUser') || 'Anonymous', text: feedbackText, timestamp: new Date().toLocaleString() });
-        localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
-        document.getElementById('feedbackInput').value = '';
-        
-        renderFeedback();
+    const feedbackData = {
+        user: localStorage.getItem('loggedInUser') || 'Anonymous',
+        text: feedbackText,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
 
-        const feedbackMessage = document.getElementById('feedbackMessage');
-        feedbackMessage.textContent = 'Thank you! Your feedback has been submitted.';
-        feedbackMessage.style.display = 'block';
-
-        setTimeout(() => {
-            feedbackMessage.style.display = 'none';
-            showContainer('.comments-container');
+    db.collection("feedback").add(feedbackData)
+        .then(() => {
+            document.getElementById('feedbackInput').value = '';
+            const feedbackMessage = document.getElementById('feedbackMessage');
+            feedbackMessage.textContent = 'Thank you! Your feedback has been submitted.';
+            feedbackMessage.style.display = 'block';
+            renderFeedback();
+            setTimeout(() => {
+                feedbackMessage.style.display = 'none';
+                showContainer('.comments-container');
+                setLoading(sendFeedbackBtn, false);
+            }, 2000); 
+        })
+        .catch(error => {
+            console.error("Error submitting feedback: ", error);
             setLoading(sendFeedbackBtn, false);
-        }, 2000); 
-    }
+        });
 }
 
 function renderFeedback() {
     const feedbackList = document.getElementById('feedbackList');
-    let feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    feedbackList.innerHTML = feedbacks.length === 0 ? '<p style="color:#2193b0;text-align:center;">No feedback yet.</p>' : '';
-    feedbacks.slice().reverse().forEach(feedback => {
-        const div = document.createElement('div');
-        div.className = 'feedback-item';
-        div.innerHTML = `<span class="feedback-user">${feedback.user}</span><span class="feedback-text">${feedback.text}</span><div class="feedback-timestamp">${feedback.timestamp || ''}</div>`;
-        feedbackList.appendChild(div);
+    if (feedbackListenerUnsubscribe) feedbackListenerUnsubscribe();
+    
+    feedbackListenerUnsubscribe = db.collection("feedback").orderBy("timestamp", "desc").onSnapshot((querySnapshot) => {
+        feedbackList.innerHTML = querySnapshot.empty ? '<p style="color:#2193b0;text-align:center;">No feedback yet.</p>' : '';
+        querySnapshot.forEach(doc => {
+            const feedback = doc.data();
+            const div = document.createElement('div');
+            div.className = 'feedback-item';
+            div.innerHTML = `<span class="feedback-user">${feedback.user}</span><span class="feedback-text">${feedback.text}</span><div class="feedback-timestamp">${feedback.timestamp ? feedback.timestamp.toDate().toLocaleString() : ''}</div>`;
+            feedbackList.appendChild(div);
+        });
     });
 }
