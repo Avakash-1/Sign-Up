@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles/style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body>
+<body style="visibility: hidden;">
     <div class="avatar-bar">
         <img id="avatarImg" src="https://ui-avatars.com/api/?name=Guest&background=6e45e2&color=fff&rounded=true" alt="Avatar" class="avatar-img">
         <input type="file" id="avatarInput" accept="image/*" style="display:none;">
@@ -18,8 +18,7 @@
         <button class="dark-mode-toggle">🌙</button>
         <h2>Sign Up</h2>
         <form id="signupForm">
-            <input type="text" id="signupUsername" placeholder="Choose a Username" required>
-            <input type="text" id="username" placeholder="Email" required>
+            <input type="text" id="username" placeholder="Username" required>
             <div style="position:relative;">
                 <input type="password" id="password" placeholder="Password" required>
                 <button type="button" id="toggleSignupPassword" class="show-btn">Show</button>
@@ -33,7 +32,7 @@
         <button class="dark-mode-toggle">🌙</button>
         <h2>Log In</h2>
         <form id="loginForm">
-            <input type="text" id="loginUsername" placeholder="Email" required>
+            <input type="text" id="loginUsername" placeholder="Username" required>
             <div style="position:relative;">
                 <input type="password" id="loginPassword" placeholder="Password" required>
                 <button type="button" id="toggleLoginPassword" class="show-btn">Show</button>
@@ -55,7 +54,7 @@
             <div class="form-actions">
                 <input type="file" id="commentFileInput" accept="image/*,video/*" style="display: none;">
                 <button type="button" id="attachFileBtn" class="secondary-btn">📎 Attach File</button>
-                <button type="submit" id="postCommentBtn">Post</button>
+                <button type="submit">Post</button>
             </div>
             <span id="fileName" class="file-name-display"></span>
         </form>
@@ -69,9 +68,7 @@
             </select>
         </div>
         <div id="commentsList"></div>
-<button id="loadMoreBtn" class="secondary-btn" style="margin-top: 1em; display: none;">Load More</button>
-<button id="showFeedbackBtn" style="margin-top:2em;">Go to Feedback</button>
-       
+        <button id="showFeedbackBtn" style="margin-top:2em;">Go to Feedback</button>
         <button id="logoutBtn" style="margin-top:1em;">Log Out</button>
     </div>
     <div class="profile-container" style="display:none;">
@@ -109,7 +106,7 @@
         <h2>Feedback</h2>
         <form id="feedbackForm">
             <textarea id="feedbackInput" placeholder="Your feedback..." required></textarea>
-            <button type="submit" id="sendFeedbackBtn">Send Feedback</button>
+            <button type="submit">Send Feedback</button>
         </form>
         <p id="feedbackMessage" style="display: none; color: #2193b0; font-weight: bold; margin-top: 1em;"></p>
         <div id="feedbackList"></div>
@@ -124,13 +121,6 @@
         <div id="chatTabBody" class="chat-tab-body">
             </div>
     </div>
-    
-    <button id="scrollToggleBtn" title="Go to Bottom">▼</button>
-
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 
     <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
     <script src="Javascript/main.js"></script>
